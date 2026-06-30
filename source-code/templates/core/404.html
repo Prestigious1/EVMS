@@ -1,0 +1,8 @@
+{% extends "hall/base.html" %}
+{% block content %}
+  <div class="text-center py-5">
+    <h1 class="display-4 fw-bold text-warning">404</h1>
+    <p class="lead">The page you are looking for was not found.</p>
+    <a class="btn btn-primary" href="{% url 'hall:home' %}">Return Home</a>
+  </div>
+{% endblock %}

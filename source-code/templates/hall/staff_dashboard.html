@@ -1,0 +1,114 @@
+{% extends "hall/base.html" %}
+{% load auth_extras %}
+{% block content %}
+{# ══════════════════════════════════════════════════════════ #}
+{#  LASU STAFF DASHBOARD                                     #}
+{# ══════════════════════════════════════════════════════════ #}
+
+<div class="page-header">
+  <div>
+    <h1><i class="bi bi-person-workspace text-secondary me-2"></i>Staff Dashboard</h1>
+    <p class="page-subtitle">Welcome, {{ request.user.get_full_name|default:request.user.username }}. Access reports, bookings and management tools.</p>
+  </div>
+  <div class="d-flex flex-wrap gap-2">
+    <a class="btn btn-gold btn-sm hover-lift" href="{% url 'hall:hall_list' %}"><i class="bi bi-search"></i> Find Halls</a>
+    <a class="btn border text-body btn-sm hover-lift" href="{% url 'reservations:calendar' %}"><i class="bi bi-calendar3 text-secondary"></i> Calendar</a>
+    <a class="btn border border-primary text-body btn-sm hover-lift" href="{% url 'reports:dashboard' %}"><i class="bi bi-graph-up-arrow text-primary"></i> Reports</a>
+    {% if request.user|has_capability:"ventures_workflow" %}
+      <a class="btn border border-warning text-body btn-sm hover-lift" href="{% url 'reservations:ventures_dashboard' %}"><i class="bi bi-diagram-3 text-warning"></i> Ventures Desk</a>
+    {% endif %}
+    {% if request.user|has_capability:"facility_workflow" %}
+      <a class="btn border border-info text-body btn-sm hover-lift" href="{% url 'reservations:facility_dashboard' %}"><i class="bi bi-tools text-info"></i> Facility Desk</a>
+    {% endif %}
+  </div>
+</div>
+
+{# Stat cards #}
+<div class="row g-3 mb-4">
+  <div class="col-md-6 col-lg-3">
+    <a href="{% url 'reservations:my_reservations' %}" class="text-decoration-none">
+    <div class="card app-card h-100 hover-lift">
+      <div class="card-body">
+        <div class="d-flex justify-content-between align-items-start">
+          <div>
+            <div class="text-body-secondary small">Upcoming reservations</div>
+            <div class="display-6 fw-semibold">{{ upcoming }}</div>
+          </div>
+          <i class="bi bi-calendar-check fs-3 text-success"></i>
+        </div>
+      </div>
+    </div>
+    </a>
+  </div>
+  <div class="col-md-6 col-lg-3">
+    <a href="{% url 'reservations:my_reservations' %}" class="text-decoration-none">
+    <div class="card app-card h-100 hover-lift">
+      <div class="card-body">
+        <div class="d-flex justify-content-between align-items-start">
+          <div>
+            <div class="text-body-secondary small">Pending requests</div>
+            <div class="display-6 fw-semibold">{{ pending }}</div>
+          </div>
+          <i class="bi bi-hourglass-split fs-3 text-warning"></i>
+        </div>
+      </div>
+    </div>
+    </a>
+  </div>
+  <div class="col-md-6 col-lg-3">
+    <a href="{% url 'hall:hall_list' %}" class="text-decoration-none">
+    <div class="card app-card h-100 hover-lift">
+      <div class="card-body">
+        <div class="d-flex justify-content-between align-items-start">
+          <div>
+            <div class="text-body-secondary small">Available halls</div>
+            <div class="display-6 fw-semibold">{{ halls_count }}</div>
+          </div>
+          <i class="bi bi-building fs-3 text-primary"></i>
+        </div>
+      </div>
+    </div>
+    </a>
+  </div>
+  <div class="col-md-6 col-lg-3">
+    <a href="{% url 'notifications:inbox' %}" class="text-decoration-none">
+    <div class="card app-card h-100 hover-lift">
+      <div class="card-body">
+        <div class="d-flex justify-content-between align-items-start">
+          <div>
+            <div class="text-body-secondary small">Unread notifications</div>
+            <div class="display-6 fw-semibold">{{ unread_notifications }}</div>
+          </div>
+          <i class="bi bi-bell fs-3 text-danger"></i>
+        </div>
+      </div>
+    </div>
+    </a>
+  </div>
+</div>
+
+{# Quick links for staff-available features #}
+<div class="card app-card mb-4">
+  <div class="card-header fw-semibold"><i class="bi bi-lightning-charge me-1 text-warning"></i>Staff Quick Access</div>
+  <div class="card-body">
+    <div class="d-flex flex-wrap gap-2">
+      <a href="{% url 'reservations:my_reservations' %}" class="btn btn-sm btn-outline-secondary"><i class="bi bi-list-ul"></i> My Reservations</a>
+      <a href="{% url 'reservations:calendar' %}" class="btn btn-sm btn-outline-secondary"><i class="bi bi-calendar3"></i> Booking Calendar</a>
+      <a href="{% url 'reports:dashboard' %}" class="btn btn-sm btn-outline-primary"><i class="bi bi-graph-up-arrow"></i> System Reports</a>
+      <a href="{% url 'notifications:inbox' %}" class="btn btn-sm btn-outline-secondary"><i class="bi bi-bell"></i> Notifications</a>
+      <a href="{% url 'hall:hall_list' %}" class="btn btn-sm btn-outline-success"><i class="bi bi-building"></i> Browse Halls</a>
+      <a href="{% url 'payments:my_payments' %}" class="btn btn-sm btn-outline-secondary"><i class="bi bi-credit-card"></i> My Payments</a>
+      <a href="{% url 'users:profile' %}" class="btn btn-sm btn-outline-secondary"><i class="bi bi-person-circle"></i> My Profile</a>
+      {% if request.user|has_capability:"ventures_workflow" %}
+        <a href="{% url 'reservations:ventures_dashboard' %}" class="btn btn-sm btn-warning"><i class="bi bi-diagram-3"></i> Ventures Desk</a>
+        <a href="{% url 'reservations:penalty_list' %}" class="btn btn-sm btn-outline-danger"><i class="bi bi-exclamation-octagon"></i> Penalties</a>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+<div class="alert alert-secondary border-0">
+  <i class="bi bi-info-circle"></i>
+  As a staff member you have access to system reports and the Ventures desk (if assigned). Use the sidebar or quick access buttons above to navigate to your workspaces.
+</div>
+{% endblock %}

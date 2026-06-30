@@ -1,0 +1,228 @@
+{% extends "hall/base.html" %}
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-xl-9">
+    <div class="d-flex align-items-center gap-3 mb-4">
+      <a href="{% url 'payments:coupon_list' %}" class="btn btn-sm btn-outline-secondary">
+        <i class="bi bi-arrow-left"></i>
+      </a>
+      {% if coupon %}
+        <h1 class="h4 mb-0">Edit Coupon — <code class="text-warning">{{ coupon.code }}</code></h1>
+      {% else %}
+        <h1 class="h4 mb-0">Create New Coupon</h1>
+      {% endif %}
+    </div>
+
+    <form method="post" novalidate>
+      {% csrf_token %}
+
+      <!-- ── Section 1: Identity ── -->
+      <div class="card app-card mb-4">
+        <div class="card-body">
+          <h5 class="h6 text-body-secondary text-uppercase fw-semibold mb-3">
+            <i class="bi bi-tag me-1"></i> Coupon Identity
+          </h5>
+          <div class="row g-3">
+            <div class="col-md-4">
+              <label for="id_code" class="form-label fw-semibold">Coupon Code <span class="text-danger">*</span></label>
+              <input type="text" id="id_code" name="code" class="form-control font-monospace text-uppercase"
+                     value="{{ coupon.code|default:'' }}"
+                     {% if coupon %}readonly{% endif %}
+                     placeholder="e.g. LASU2026" maxlength="50" required>
+              {% if coupon %}
+                <div class="form-text">Coupon codes cannot be changed after creation.</div>
+              {% endif %}
+            </div>
+            <div class="col-md-8">
+              <label for="id_name" class="form-label fw-semibold">Display Name</label>
+              <input type="text" id="id_name" name="name" class="form-control" maxlength="200"
+                     value="{{ coupon.name|default:'' }}"
+                     placeholder="e.g. Student Discount 2026">
+            </div>
+            <div class="col-12">
+              <label for="id_description" class="form-label fw-semibold">Description</label>
+              <textarea id="id_description" name="description" class="form-control" rows="2"
+                        placeholder="Brief description of this discount.">{{ coupon.description|default:'' }}</textarea>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── Section 2: Discount Value ── -->
+      <div class="card app-card mb-4">
+        <div class="card-body">
+          <h5 class="h6 text-body-secondary text-uppercase fw-semibold mb-3">
+            <i class="bi bi-percent me-1"></i> Discount Value
+          </h5>
+          <div class="row g-3">
+            <div class="col-md-4">
+              <label for="id_discount_type" class="form-label fw-semibold">Discount Type</label>
+              <select id="id_discount_type" name="discount_type" class="form-select">
+                {% for val, label in discount_types %}
+                  <option value="{{ val }}" {% if coupon and coupon.discount_type == val %}selected{% endif %}>{{ label }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="col-md-4">
+              <label for="id_value" class="form-label fw-semibold">Value</label>
+              <div class="input-group">
+                <span class="input-group-text" id="value-prefix">%</span>
+                <input type="number" id="id_value" name="value" class="form-control" min="0" step="0.01"
+                       value="{{ coupon.value|default:'0' }}" required>
+              </div>
+              <div class="form-text">For Percentage: enter %, e.g. 10 for 10%. For Fixed: enter ₦ amount.</div>
+            </div>
+            <div class="col-md-4">
+              <label for="id_max_discount" class="form-label fw-semibold">Max Discount (₦) <span class="text-body-secondary">(optional)</span></label>
+              <div class="input-group">
+                <span class="input-group-text">₦</span>
+                <input type="number" id="id_max_discount" name="max_discount" class="form-control" min="0" step="0.01"
+                       value="{{ coupon.max_discount|default:'' }}" placeholder="No cap">
+              </div>
+              <div class="form-text">Caps the maximum discount for percentage coupons.</div>
+            </div>
+            <div class="col-md-6">
+              <label for="id_min_booking_amount" class="form-label fw-semibold">Minimum Booking Amount (₦)</label>
+              <div class="input-group">
+                <span class="input-group-text">₦</span>
+                <input type="number" id="id_min_booking_amount" name="min_booking_amount" class="form-control" min="0" step="0.01"
+                       value="{{ coupon.min_booking_amount|default:'0' }}">
+              </div>
+            </div>
+            <div class="col-md-6">
+              <label for="id_owner_department" class="form-label fw-semibold">Owning Department</label>
+              <select id="id_owner_department" name="owner_department" class="form-select">
+                <option value="">— Not assigned —</option>
+                <option value="VENTURES" {% if coupon and coupon.owner_department == "VENTURES" %}selected{% endif %}>Ventures</option>
+                <option value="FACILITY" {% if coupon and coupon.owner_department == "FACILITY" %}selected{% endif %}>Facility</option>
+              </select>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── Section 3: Validity & Limits ── -->
+      <div class="card app-card mb-4">
+        <div class="card-body">
+          <h5 class="h6 text-body-secondary text-uppercase fw-semibold mb-3">
+            <i class="bi bi-clock-history me-1"></i> Validity & Usage Limits
+          </h5>
+          <div class="row g-3">
+            <div class="col-md-6">
+              <label for="id_valid_from" class="form-label fw-semibold">Valid From</label>
+              <input type="datetime-local" id="id_valid_from" name="valid_from" class="form-control"
+                     value="{{ coupon.valid_from|date:'Y-m-d\TH:i'|default:'' }}">
+            </div>
+            <div class="col-md-6">
+              <label for="id_valid_until" class="form-label fw-semibold">Valid Until</label>
+              <input type="datetime-local" id="id_valid_until" name="valid_until" class="form-control"
+                     value="{{ coupon.valid_until|date:'Y-m-d\TH:i'|default:'' }}">
+            </div>
+            <div class="col-md-6">
+              <label for="id_total_usage_limit" class="form-label fw-semibold">Total Usage Limit <span class="text-body-secondary">(blank = unlimited)</span></label>
+              <input type="number" id="id_total_usage_limit" name="total_usage_limit" class="form-control" min="1"
+                     value="{{ coupon.total_usage_limit|default:'' }}" placeholder="Unlimited">
+            </div>
+            <div class="col-md-6">
+              <label for="id_usage_per_user" class="form-label fw-semibold">Max Uses Per User</label>
+              <input type="number" id="id_usage_per_user" name="usage_per_user" class="form-control" min="1"
+                     value="{{ coupon.usage_per_user|default:'1' }}">
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── Section 4: Restrictions ── -->
+      <div class="card app-card mb-4">
+        <div class="card-body">
+          <h5 class="h6 text-body-secondary text-uppercase fw-semibold mb-3">
+            <i class="bi bi-shield-lock me-1"></i> Restrictions
+          </h5>
+          <div class="row g-3">
+            <div class="col-md-4">
+              <label for="id_role_restriction" class="form-label fw-semibold">User Role Restriction</label>
+              <select id="id_role_restriction" name="role_restriction" class="form-select">
+                {% for val, label in role_choices %}
+                  <option value="{{ val }}" {% if coupon and coupon.role_restriction == val %}selected{% endif %}>{{ label }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="col-md-4">
+              <label for="id_faculty_restriction" class="form-label fw-semibold">Faculty Restriction <span class="text-body-secondary">(optional)</span></label>
+              <input type="text" id="id_faculty_restriction" name="faculty_restriction" class="form-control" maxlength="200"
+                     value="{{ coupon.faculty_restriction|default:'' }}" placeholder="e.g. Faculty of Science">
+            </div>
+            <div class="col-md-4">
+              <label for="id_department_restriction" class="form-label fw-semibold">Department Restriction <span class="text-body-secondary">(optional)</span></label>
+              <input type="text" id="id_department_restriction" name="department_restriction" class="form-control" maxlength="200"
+                     value="{{ coupon.department_restriction|default:'' }}" placeholder="e.g. Computer Science">
+            </div>
+
+            <!-- Applicable Halls -->
+            {% if halls %}
+            <div class="col-12">
+              <label class="form-label fw-semibold">Applicable Halls <span class="text-body-secondary">(blank = all halls)</span></label>
+              <div class="row g-2" style="max-height: 200px; overflow-y: auto; border: 1px solid rgba(255,255,255,.1); border-radius: 8px; padding: 10px;">
+                {% for hall in halls %}
+                  <div class="col-sm-6 col-md-4">
+                    <div class="form-check">
+                      <input class="form-check-input" type="checkbox" name="applicable_halls"
+                             id="hall_{{ hall.pk }}" value="{{ hall.pk }}"
+                             {% if current_hall_ids and hall.pk in current_hall_ids %}checked{% endif %}>
+                      <label class="form-check-label small" for="hall_{{ hall.pk }}">{{ hall.name }}</label>
+                    </div>
+                  </div>
+                {% endfor %}
+              </div>
+            </div>
+            {% endif %}
+
+            <div class="col-12">
+              <div class="d-flex gap-4 mt-1">
+                <div class="form-check form-switch">
+                  <input class="form-check-input" type="checkbox" id="id_is_stackable" name="is_stackable"
+                         {% if coupon and coupon.is_stackable %}checked{% endif %}>
+                  <label class="form-check-label" for="id_is_stackable">Stackable (can combine with other coupons)</label>
+                </div>
+                <div class="form-check form-switch">
+                  <input class="form-check-input" type="checkbox" id="id_is_active" name="is_active"
+                         {% if coupon.is_active or not coupon %}checked{% endif %}>
+                  <label class="form-check-label" for="id_is_active">Active</label>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── Actions ── -->
+      <div class="d-flex gap-2 justify-content-end mb-5">
+        <a href="{% url 'payments:coupon_list' %}" class="btn btn-outline-secondary">Cancel</a>
+        {% if coupon %}
+          <button type="submit" class="btn btn-primary px-4">
+            <i class="bi bi-floppy me-1"></i> Save Changes
+          </button>
+        {% else %}
+          <button type="submit" class="btn btn-success px-4">
+            <i class="bi bi-plus-circle me-1"></i> Create Coupon
+          </button>
+        {% endif %}
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+// Update the value prefix symbol based on discount type
+document.getElementById('id_discount_type').addEventListener('change', function() {
+  const prefix = document.getElementById('value-prefix');
+  prefix.textContent = this.value === 'PERCENTAGE' ? '%' : '₦';
+});
+// Init on load
+(function() {
+  const sel = document.getElementById('id_discount_type');
+  const prefix = document.getElementById('value-prefix');
+  if (sel && prefix) prefix.textContent = sel.value === 'PERCENTAGE' ? '%' : '₦';
+})();
+</script>
+{% endblock %}

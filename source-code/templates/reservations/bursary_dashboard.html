@@ -1,0 +1,405 @@
+{% extends "hall/base.html" %}
+{% load static %}
+
+{% block title %}Bursary Dashboard{% endblock %}
+{% block nav_bursary %}active{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+
+  <!-- ── Page Header ─────────────────────────────────────────── -->
+  <div class="page-header mb-4">
+    <div>
+      <h1><i class="bi bi-shield-check text-gold me-2"></i>Bursary Dashboard</h1>
+      <p class="page-subtitle">Payment verification queue &amp; financial oversight</p>
+    </div>
+    <div class="d-flex gap-2 flex-wrap">
+      <a href="{% url 'reports:dashboard' %}" class="btn btn-sm btn-outline-secondary">
+        <i class="bi bi-graph-up-arrow me-1"></i> Reports
+      </a>
+      <a href="{% url 'reservations:bursary_audit_logs' %}" class="btn btn-sm btn-outline-secondary">
+        <i class="bi bi-journal-text me-1"></i> Audit Logs
+      </a>
+    </div>
+  </div>
+
+  <!-- ── 6 Stat Cards ──────────────────────────────────────────── -->
+  <div class="row row-cols-2 row-cols-md-3 row-cols-lg-6 g-3 mb-4">
+
+    <!-- Pending Booking Payments -->
+    <div class="col">
+      <a href="#payment-queue" class="text-decoration-none">
+        <div class="app-card stat-card hover-lift p-3 h-100">
+          <div class="d-flex align-items-center justify-content-between mb-2">
+            <div class="stat-icon" style="background: rgba(234,179,8,.15); color: #ca8a04; width:36px; height:36px; border-radius:10px; display:flex; align-items:center; justify-content:center; font-size:1.1rem;">
+              <i class="bi bi-receipt"></i>
+            </div>
+          </div>
+          <div class="stat-value" style="font-size:1.5rem; font-weight:800; color:#F8FAFC; line-height:1;">{{ pending_booking.count }}</div>
+          <div class="stat-label mt-1" style="font-size:0.75rem; color:rgba(148,163,184,0.8); font-weight:500; line-height:1.2;">Pending<br>Booking Payments</div>
+        </div>
+      </a>
+    </div>
+
+    <!-- Pending Damage Payments -->
+    <div class="col">
+      <a href="#damage-queue" class="text-decoration-none">
+        <div class="app-card stat-card hover-lift p-3 h-100">
+          <div class="d-flex align-items-center justify-content-between mb-2">
+            <div class="stat-icon" style="background: rgba(239,68,68,.15); color: #ef4444; width:36px; height:36px; border-radius:10px; display:flex; align-items:center; justify-content:center; font-size:1.1rem;">
+              <i class="bi bi-tools"></i>
+            </div>
+          </div>
+          <div class="stat-value" style="font-size:1.5rem; font-weight:800; color:#F8FAFC; line-height:1;">{{ pending_damage.count }}</div>
+          <div class="stat-label mt-1" style="font-size:0.75rem; color:rgba(148,163,184,0.8); font-weight:500; line-height:1.2;">Pending<br>Damage Payments</div>
+        </div>
+      </a>
+    </div>
+
+    <!-- Under Active Review -->
+    <div class="col">
+      <a href="#under-review" class="text-decoration-none">
+        <div class="app-card stat-card hover-lift p-3 h-100">
+          <div class="d-flex align-items-center justify-content-between mb-2">
+            <div class="stat-icon" style="background: rgba(99,102,241,.15); color: #818cf8; width:36px; height:36px; border-radius:10px; display:flex; align-items:center; justify-content:center; font-size:1.1rem;">
+              <i class="bi bi-hourglass-split"></i>
+            </div>
+          </div>
+          <div class="stat-value" style="font-size:1.5rem; font-weight:800; color:#F8FAFC; line-height:1;">{{ total_under_review }}</div>
+          <div class="stat-label mt-1" style="font-size:0.75rem; color:rgba(148,163,184,0.8); font-weight:500; line-height:1.2;">Under<br>Active Review</div>
+        </div>
+      </a>
+    </div>
+
+    <!-- Awaiting Clarification -->
+    <div class="col">
+      <a href="#clarification-queue" class="text-decoration-none">
+        <div class="app-card stat-card hover-lift p-3 h-100">
+          <div class="d-flex align-items-center justify-content-between mb-2">
+            <div class="stat-icon" style="background: rgba(245,158,11,.15); color: #f59e0b; width:36px; height:36px; border-radius:10px; display:flex; align-items:center; justify-content:center; font-size:1.1rem;">
+              <i class="bi bi-question-circle"></i>
+            </div>
+          </div>
+          <div class="stat-value" style="font-size:1.5rem; font-weight:800; color:#F8FAFC; line-height:1;">{{ total_awaiting_clarification }}</div>
+          <div class="stat-label mt-1" style="font-size:0.75rem; color:rgba(148,163,184,0.8); font-weight:500; line-height:1.2;">Awaiting<br>Clarification</div>
+        </div>
+      </a>
+    </div>
+
+    <!-- Verified Today -->
+    <div class="col">
+      <div class="app-card stat-card p-3 h-100">
+        <div class="d-flex align-items-center justify-content-between mb-2">
+          <div class="stat-icon" style="background: rgba(34,197,94,.15); color: #4ade80; width:36px; height:36px; border-radius:10px; display:flex; align-items:center; justify-content:center; font-size:1.1rem;">
+            <i class="bi bi-check2-circle"></i>
+          </div>
+        </div>
+        <div class="stat-value" style="font-size:1.5rem; font-weight:800; color:#F8FAFC; line-height:1;">{{ verified_today }}</div>
+        <div class="stat-label mt-1" style="font-size:0.75rem; color:rgba(148,163,184,0.8); font-weight:500; line-height:1.2;">Payments<br>Verified Today</div>
+      </div>
+    </div>
+
+    <!-- Rejected Today -->
+    <div class="col">
+      <div class="app-card stat-card p-3 h-100">
+        <div class="d-flex align-items-center justify-content-between mb-2">
+          <div class="stat-icon" style="background: rgba(239,68,68,.15); color: #f87171; width:36px; height:36px; border-radius:10px; display:flex; align-items:center; justify-content:center; font-size:1.1rem;">
+            <i class="bi bi-x-circle"></i>
+          </div>
+        </div>
+        <div class="stat-value" style="font-size:1.5rem; font-weight:800; color:#F8FAFC; line-height:1;">{{ rejected_today }}</div>
+        <div class="stat-label mt-1" style="font-size:0.75rem; color:rgba(148,163,184,0.8); font-weight:500; line-height:1.2;">Payments<br>Rejected Today</div>
+      </div>
+    </div>
+
+  </div><!-- /stat row -->
+
+  <!-- ── Main Content Row ────────────────────────────────────── -->
+  <div class="row g-4">
+
+    <!-- LEFT: Payment Queues -->
+    <div class="col-lg-8">
+
+      <!-- Payment Verification Queue -->
+      <div class="app-card mb-4" id="payment-queue">
+        <div class="p-4 pb-2 border-bottom" style="border-color:rgba(255,255,255,.08)!important;">
+          <div class="d-flex align-items-center justify-content-between mb-2">
+            <h5 class="mb-0 fw-700" style="color:#F8FAFC;"><i class="bi bi-receipt text-gold me-2"></i>Booking Payment Queue</h5>
+            {% if pending_booking %}
+              <span class="badge" style="background:rgba(234,179,8,.2); color:#ca8a04;">{{ pending_booking.count }} pending</span>
+            {% endif %}
+          </div>
+          <p class="text-body-secondary small mb-0">Booking payments recently submitted awaiting your initial review.</p>
+        </div>
+        <div class="table-responsive">
+          <table class="table table-hover align-middle mb-0 custom-table">
+            <thead>
+              <tr>
+                <th class="ps-4">Reference</th>
+                <th>Applicant</th>
+                <th>Hall</th>
+                <th>Amount</th>
+                <th>Status</th>
+                <th class="text-end pe-4">Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for booking in pending_booking %}
+              <tr>
+                <td class="ps-4 fw-600" style="color:#F8FAFC;">{{ booking.booking_reference }}</td>
+                <td>{{ booking.user.get_full_name|default:booking.user.username }}</td>
+                <td>{{ booking.hall.name }}</td>
+                <td>₦{{ booking.total_cost }}</td>
+                <td><span class="status-pill" style="background:rgba(234,179,8,.15); color:#ca8a04;">{{ booking.get_case_status_display }}</span></td>
+                <td class="text-end pe-4">
+                  <a href="{% url 'reservations:detail' booking.booking_reference %}?tab=bursary" class="btn btn-sm btn-gold">Review</a>
+                </td>
+              </tr>
+              {% empty %}
+              <tr>
+                <td colspan="6" class="text-center py-4 text-body-secondary">No pending booking payments.</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Damage Payment Queue -->
+      <div class="app-card mb-4" id="damage-queue">
+        <div class="p-4 pb-2 border-bottom" style="border-color:rgba(255,255,255,.08)!important;">
+          <div class="d-flex align-items-center justify-content-between mb-2">
+            <h5 class="mb-0 fw-700" style="color:#F8FAFC;"><i class="bi bi-tools text-danger me-2"></i>Damage Payment Queue</h5>
+            {% if pending_damage %}
+              <span class="badge" style="background:rgba(239,68,68,.2); color:#ef4444;">{{ pending_damage.count }} pending</span>
+            {% endif %}
+          </div>
+          <p class="text-body-secondary small mb-0">Post-event damage/penalty payments awaiting your initial review.</p>
+        </div>
+        <div class="table-responsive">
+          <table class="table table-hover align-middle mb-0 custom-table">
+            <thead>
+              <tr>
+                <th class="ps-4">Reference</th>
+                <th>Applicant</th>
+                <th>Hall</th>
+                <th>Status</th>
+                <th class="text-end pe-4">Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for booking in pending_damage %}
+              <tr>
+                <td class="ps-4 fw-600" style="color:#F8FAFC;">{{ booking.booking_reference }}</td>
+                <td>{{ booking.user.get_full_name|default:booking.user.username }}</td>
+                <td>{{ booking.hall.name }}</td>
+                <td><span class="status-pill" style="background:rgba(239,68,68,.15); color:#ef4444;">{{ booking.get_case_status_display }}</span></td>
+                <td class="text-end pe-4">
+                  <a href="{% url 'reservations:detail' booking.booking_reference %}?tab=bursary" class="btn btn-sm btn-outline-danger">Review</a>
+                </td>
+              </tr>
+              {% empty %}
+              <tr>
+                <td colspan="5" class="text-center py-4 text-body-secondary">No pending damage payments.</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Under Review & Clarification Queues -->
+      <div class="app-card mb-4" id="under-review">
+        <div class="p-4 pb-0 border-bottom" style="border-color:rgba(255,255,255,.08)!important;">
+          <ul class="nav nav-tabs nav-tabs-custom" role="tablist">
+            <li class="nav-item" role="presentation">
+              <button class="nav-link active" data-bs-toggle="tab" data-bs-target="#tab-under-review" type="button" role="tab">
+                Under Active Review ({{ total_under_review }})
+              </button>
+            </li>
+            <li class="nav-item" role="presentation">
+              <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-clarification" type="button" role="tab">
+                Awaiting Clarification ({{ total_awaiting_clarification }})
+              </button>
+            </li>
+          </ul>
+        </div>
+        
+        <div class="tab-content p-0">
+          <!-- Active Review Tab -->
+          <div class="tab-pane fade show active" id="tab-under-review" role="tabpanel">
+            <div class="table-responsive">
+              <table class="table table-hover align-middle mb-0 custom-table">
+                <thead>
+                  <tr>
+                    <th class="ps-4">Reference</th>
+                    <th>Applicant</th>
+                    <th>Status</th>
+                    <th class="text-end pe-4">Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for booking in under_bursary_verification %}
+                  <tr>
+                    <td class="ps-4 fw-600" style="color:#F8FAFC;">{{ booking.booking_reference }}</td>
+                    <td>{{ booking.user.get_full_name|default:booking.user.username }}</td>
+                    <td><span class="status-pill" style="background:rgba(99,102,241,.15); color:#818cf8;">{{ booking.get_case_status_display }}</span></td>
+                    <td class="text-end pe-4">
+                      <a href="{% url 'reservations:detail' booking.booking_reference %}?tab=bursary" class="btn btn-sm btn-outline-light">Continue</a>
+                    </td>
+                  </tr>
+                  {% endfor %}
+                  {% for booking in under_damage_verification %}
+                  <tr>
+                    <td class="ps-4 fw-600" style="color:#F8FAFC;">{{ booking.booking_reference }}</td>
+                    <td>{{ booking.user.get_full_name|default:booking.user.username }}</td>
+                    <td><span class="status-pill" style="background:rgba(99,102,241,.15); color:#818cf8;">{{ booking.get_case_status_display }}</span></td>
+                    <td class="text-end pe-4">
+                      <a href="{% url 'reservations:detail' booking.booking_reference %}?tab=bursary" class="btn btn-sm btn-outline-light">Continue</a>
+                    </td>
+                  </tr>
+                  {% endfor %}
+                  {% if not under_bursary_verification and not under_damage_verification %}
+                  <tr>
+                    <td colspan="4" class="text-center py-4 text-body-secondary">No cases under active review.</td>
+                  </tr>
+                  {% endif %}
+                </tbody>
+              </table>
+            </div>
+          </div>
+          
+          <!-- Clarification Tab -->
+          <div class="tab-pane fade" id="tab-clarification" role="tabpanel">
+            <div class="table-responsive">
+              <table class="table table-hover align-middle mb-0 custom-table">
+                <thead>
+                  <tr>
+                    <th class="ps-4">Reference</th>
+                    <th>Applicant</th>
+                    <th>Status</th>
+                    <th class="text-end pe-4">Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for booking in awaiting_clarification %}
+                  <tr>
+                    <td class="ps-4 fw-600" style="color:#F8FAFC;">{{ booking.booking_reference }}</td>
+                    <td>{{ booking.user.get_full_name|default:booking.user.username }}</td>
+                    <td><span class="status-pill" style="background:rgba(245,158,11,.15); color:#f59e0b;">Awaiting Clarification</span></td>
+                    <td class="text-end pe-4">
+                      <a href="{% url 'reservations:detail' booking.booking_reference %}?tab=bursary" class="btn btn-sm btn-outline-light">Check Reply</a>
+                    </td>
+                  </tr>
+                  {% empty %}
+                  <tr>
+                    <td colspan="4" class="text-center py-4 text-body-secondary">No cases awaiting clarification.</td>
+                  </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+    </div>
+
+    <!-- RIGHT: Charts & Activity -->
+    <div class="col-lg-4">
+
+      <!-- 7-Day Trend Chart -->
+      <div class="app-card p-4 mb-4">
+        <h5 class="fw-700 mb-3" style="color:#F8FAFC;"><i class="bi bi-bar-chart-fill me-2 text-gold"></i>Verification Trend</h5>
+        <div style="height:250px; width:100%;">
+          <canvas id="bursaryChart"></canvas>
+        </div>
+      </div>
+
+      <!-- Recent Audit Log / Activity -->
+      <div class="app-card p-4">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+          <h5 class="fw-700 mb-0" style="color:#F8FAFC;"><i class="bi bi-activity me-2 text-gold"></i>Recent Activity</h5>
+          <a href="{% url 'reservations:bursary_audit_logs' %}" class="btn btn-sm btn-link text-gold p-0">View All</a>
+        </div>
+        <div class="timeline-container">
+          {% for log in recent_activity %}
+            <div class="d-flex gap-3 mb-3">
+              <div class="mt-1">
+                <i class="bi bi-circle-fill text-gold" style="font-size:8px;"></i>
+              </div>
+              <div>
+                <div style="font-size:0.85rem; color:#F8FAFC;">
+                  <strong>{{ log.user.get_full_name|default:log.user.username }}</strong>
+                  performed <span class="text-gold">{{ log.action }}</span>
+                </div>
+                <div style="font-size:0.75rem; color:rgba(148,163,184,.8);">
+                  {{ log.timestamp|timesince }} ago • {{ log.object_repr }}
+                </div>
+              </div>
+            </div>
+          {% empty %}
+            <div class="text-center py-3 text-body-secondary small">
+              No recent activity recorded.
+            </div>
+          {% endfor %}
+        </div>
+      </div>
+
+    </div>
+
+  </div><!-- /main row -->
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+document.addEventListener("DOMContentLoaded", function() {
+    const ctx = document.getElementById('bursaryChart');
+    if(ctx) {
+        new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: {{ trend_labels|safe }},
+                datasets: [
+                    {
+                        label: 'Verified',
+                        data: {{ trend_verified|safe }},
+                        backgroundColor: 'rgba(34,197,94,0.8)',
+                        borderRadius: 4,
+                    },
+                    {
+                        label: 'Rejected',
+                        data: {{ trend_rejected|safe }},
+                        backgroundColor: 'rgba(239,68,68,0.8)',
+                        borderRadius: 4,
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'bottom',
+                        labels: { color: 'rgba(248,250,252,0.7)' }
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        ticks: { stepSize: 1, color: 'rgba(148,163,184,0.6)' },
+                        grid: { color: 'rgba(255,255,255,0.05)' }
+                    },
+                    x: {
+                        ticks: { color: 'rgba(148,163,184,0.6)' },
+                        grid: { display: false }
+                    }
+                }
+            }
+        });
+    }
+});
+</script>
+{% endblock %}

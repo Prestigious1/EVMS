@@ -1,0 +1,563 @@
+{% extends "hall/base.html" %}
+{% block title %}System Analytics &amp; Reports{% endblock %}
+{% block nav_reports %}active{% endblock %}
+
+{% block extra_head %}
+<!-- Chart.js for visualizations -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<style>
+  .analytics-card {
+    background: rgba(255,255,255,0.02);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: var(--radius-lg);
+    padding: 1.25rem;
+    height: 100%;
+  }
+  [data-bs-theme="light"] .analytics-card {
+    background: #FFFFFF;
+    border-color: var(--evms-light-border);
+    box-shadow: var(--evms-light-shadow);
+  }
+  .chart-container {
+    position: relative;
+    height: 300px;
+    width: 100%;
+  }
+  .chart-container-sm {
+    height: 220px;
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-header d-flex justify-content-between align-items-center mb-4">
+  <div>
+    <h1><i class="bi bi-graph-up-arrow text-primary me-2"></i>Analytics Dashboard</h1>
+    <p class="page-subtitle text-muted mb-0">System-wide metrics and performance tracking</p>
+  </div>
+  <div class="d-flex gap-2">
+    <a href="{% url 'reports:report_centre' %}" class="btn btn-outline-primary btn-sm hover-lift">
+      <i class="bi bi-journal-text me-1"></i>Report Centre
+    </a>
+    <div class="dropdown">
+      <button class="btn btn-outline-secondary btn-sm dropdown-toggle hover-lift" type="button" data-bs-toggle="dropdown">
+        <i class="bi bi-download me-1"></i>Export
+      </button>
+      <ul class="dropdown-menu dropdown-menu-end shadow">
+        <li><a class="dropdown-item" href="{% url 'reports:export_dashboard_pdf' %}"><i class="bi bi-file-pdf text-danger me-2"></i>Dashboard PDF</a></li>
+        <li><hr class="dropdown-divider"></li>
+        {% if scope in "full,ventures,bursary" %}
+        <li><a class="dropdown-item" href="{% url 'reports:export_report_xlsx' 'revenue' %}"><i class="bi bi-file-excel text-success me-2"></i>Revenue Data</a></li>
+        {% endif %}
+        {% if scope in "full,ventures,facility" %}
+        <li><a class="dropdown-item" href="{% url 'reports:export_report_xlsx' 'bookings' %}"><i class="bi bi-file-excel text-success me-2"></i>Booking Data</a></li>
+        {% endif %}
+      </ul>
+    </div>
+  </div>
+</div>
+
+<!-- Filters Bar -->
+<div class="card mb-4 bg-transparent border-0">
+  <div class="card-body p-0">
+    <form method="get" class="row g-2 align-items-center">
+      <div class="col-auto">
+        <label class="visually-hidden" for="periodSelect">Period</label>
+        <select class="form-select form-select-sm" id="periodSelect" name="period" onchange="this.form.submit()">
+          <option value="daily" {% if period == 'daily' %}selected{% endif %}>Today</option>
+          <option value="weekly" {% if period == 'weekly' %}selected{% endif %}>This Week</option>
+          <option value="monthly" {% if period == 'monthly' %}selected{% endif %}>This Month</option>
+          <option value="quarterly" {% if period == 'quarterly' %}selected{% endif %}>This Quarter</option>
+          <option value="yearly" {% if period == 'yearly' %}selected{% endif %}>This Year</option>
+          <option value="custom" {% if period == 'custom' %}selected{% endif %}>Custom Range</option>
+        </select>
+      </div>
+      {% if period == 'custom' %}
+      <div class="col-auto">
+        <input type="date" class="form-control form-control-sm" name="start_date" value="{{ start_date|date:'Y-m-d' }}" required>
+      </div>
+      <div class="col-auto">
+        <input type="date" class="form-control form-control-sm" name="end_date" value="{{ end_date|date:'Y-m-d' }}" required>
+      </div>
+      <div class="col-auto">
+        <button type="submit" class="btn btn-primary btn-sm">Apply</button>
+      </div>
+      {% endif %}
+      <div class="col text-end text-muted small">
+        <i class="bi bi-clock-history me-1"></i>Last updated: {{ now|date:"H:i" }}
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Tab Navigation -->
+<div class="evms-tabs mb-4" id="analyticsTabs">
+  <a class="evms-tab active" data-tab="tab-overview" href="#tab-overview" onclick="showTab(event,'analyticsTabs','analyticsBody')">
+    <i class="bi bi-grid-1x2 me-1"></i>Overview
+  </a>
+  
+  {% if scope in "full,ventures" %}
+  <a class="evms-tab" data-tab="tab-bookings" href="#tab-bookings" onclick="showTab(event,'analyticsTabs','analyticsBody')">
+    <i class="bi bi-calendar-check me-1"></i>Bookings
+  </a>
+  {% endif %}
+  
+  {% if scope in "full,ventures,bursary" %}
+  <a class="evms-tab" data-tab="tab-revenue" href="#tab-revenue" onclick="showTab(event,'analyticsTabs','analyticsBody')">
+    <i class="bi bi-cash-stack me-1"></i>Revenue
+  </a>
+  {% endif %}
+  
+  {% if scope in "full,facility" %}
+  <a class="evms-tab" data-tab="tab-utilisation" href="#tab-utilisation" onclick="showTab(event,'analyticsTabs','analyticsBody')">
+    <i class="bi bi-building-check me-1"></i>Hall Utilisation
+  </a>
+  {% endif %}
+  
+  {% if scope == "full" %}
+  <a class="evms-tab" data-tab="tab-users" href="#tab-users" onclick="showTab(event,'analyticsTabs','analyticsBody')">
+    <i class="bi bi-people me-1"></i>Users
+  </a>
+  {% endif %}
+</div>
+
+<!-- Tab Content Area -->
+<div id="analyticsBody">
+  
+  <!-- ==========================================
+       OVERVIEW TAB
+       ========================================== -->
+  <div class="evms-tab-content active" id="tab-overview">
+    
+    <div class="row g-3 mb-4">
+      <div class="col-6 col-md-3">
+        <div class="kpi-card h-100">
+          <div class="kpi-icon text-primary bg-primary bg-opacity-10"><i class="bi bi-calendar-event"></i></div>
+          <div class="kpi-value">{{ total_bookings }}</div>
+          <div class="kpi-label">Total Bookings</div>
+        </div>
+      </div>
+      <div class="col-6 col-md-3">
+        <div class="kpi-card h-100">
+          <div class="kpi-icon text-success bg-success bg-opacity-10"><i class="bi bi-check-circle"></i></div>
+          <div class="kpi-value">{{ completed_bookings }}</div>
+          <div class="kpi-label">Completed Events</div>
+        </div>
+      </div>
+      
+      {% if scope in "full,ventures,bursary" %}
+      <div class="col-6 col-md-3">
+        <div class="kpi-card h-100">
+          <div class="kpi-icon text-warning bg-warning bg-opacity-10"><i class="bi bi-cash"></i></div>
+          <div class="kpi-value fs-4">₦{{ revenue_total|floatformat:0 }}</div>
+          <div class="kpi-label">Total Revenue</div>
+        </div>
+      </div>
+      {% endif %}
+      
+      {% if scope in "full,facility" %}
+      <div class="col-6 col-md-3">
+        <div class="kpi-card h-100">
+          <div class="kpi-icon text-info bg-info bg-opacity-10"><i class="bi bi-building"></i></div>
+          <div class="kpi-value">{{ halls_total }}</div>
+          <div class="kpi-label">Active Halls</div>
+        </div>
+      </div>
+      {% endif %}
+    </div>
+
+    <!-- Overview Charts -->
+    <div class="row g-4">
+      <div class="col-12 col-lg-8">
+        <div class="analytics-card">
+          <h6 class="text-uppercase text-muted fw-bold mb-4">Booking Activity Trend (Current Year)</h6>
+          <div class="chart-container">
+            <canvas id="trendChart"></canvas>
+          </div>
+        </div>
+      </div>
+      <div class="col-12 col-lg-4">
+        <div class="analytics-card">
+          <h6 class="text-uppercase text-muted fw-bold mb-4">Booking Status Distribution</h6>
+          <div class="chart-container">
+            <canvas id="statusChart"></canvas>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==========================================
+       BOOKINGS TAB
+       ========================================== -->
+  {% if scope in "full,ventures" %}
+  <div class="evms-tab-content" id="tab-bookings">
+    <div class="row g-4 mb-4">
+      <div class="col-12 col-md-6">
+        <div class="analytics-card">
+          <h6 class="text-uppercase text-muted fw-bold mb-4">Top Event Purposes</h6>
+          <div class="chart-container">
+            <canvas id="purposeChart"></canvas>
+          </div>
+        </div>
+      </div>
+      <div class="col-12 col-md-6">
+        <div class="analytics-card">
+          <h6 class="text-uppercase text-muted fw-bold mb-4">Booking Volume by Period</h6>
+          <ul class="list-group list-group-flush bg-transparent">
+            <li class="list-group-item bg-transparent text-body d-flex justify-content-between align-items-center">
+              Today <span class="badge bg-primary rounded-pill">{{ daily_stats.daily }}</span>
+            </li>
+            <li class="list-group-item bg-transparent text-body d-flex justify-content-between align-items-center">
+              This Week <span class="badge bg-info rounded-pill">{{ daily_stats.weekly }}</span>
+            </li>
+            <li class="list-group-item bg-transparent text-body d-flex justify-content-between align-items-center">
+              This Month <span class="badge bg-success rounded-pill">{{ daily_stats.monthly }}</span>
+            </li>
+            <li class="list-group-item bg-transparent text-body d-flex justify-content-between align-items-center">
+              This Year <span class="badge bg-secondary rounded-pill">{{ daily_stats.yearly }}</span>
+            </li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- ==========================================
+       REVENUE TAB
+       ========================================== -->
+  {% if scope in "full,ventures,bursary" %}
+  <div class="evms-tab-content" id="tab-revenue">
+    <div class="row g-3 mb-4">
+      <div class="col-6 col-md-3">
+        <div class="kpi-card h-100">
+          <div class="kpi-value fs-5">₦{{ booking_revenue|floatformat:0 }}</div>
+          <div class="kpi-label">Hall Bookings</div>
+        </div>
+      </div>
+      <div class="col-6 col-md-3">
+        <div class="kpi-card h-100">
+          <div class="kpi-value fs-5">₦{{ penalty_revenue|floatformat:0 }}</div>
+          <div class="kpi-label">Penalties</div>
+        </div>
+      </div>
+      <div class="col-6 col-md-3">
+        <div class="kpi-card h-100">
+          <div class="kpi-value fs-5 text-danger">₦{{ damage_revenue|floatformat:0 }}</div>
+          <div class="kpi-label">Damage Recovery</div>
+        </div>
+      </div>
+      <div class="col-6 col-md-3">
+        <div class="kpi-card h-100">
+          <div class="kpi-value fs-5 text-warning">{{ outstanding_payments }}</div>
+          <div class="kpi-label">Pending Payments</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="row g-4">
+      <div class="col-12 col-lg-8">
+        <div class="analytics-card">
+          <h6 class="text-uppercase text-muted fw-bold mb-4">Revenue Trend (Current Year)</h6>
+          <div class="chart-container">
+            <canvas id="revenueChart"></canvas>
+          </div>
+        </div>
+      </div>
+      <div class="col-12 col-lg-4">
+        <div class="analytics-card">
+          <h6 class="text-uppercase text-muted fw-bold mb-4">Payment Methods</h6>
+          <div class="chart-container">
+            <canvas id="paymentMethodChart"></canvas>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- ==========================================
+       UTILISATION TAB
+       ========================================== -->
+  {% if scope in "full,facility" %}
+  <div class="evms-tab-content" id="tab-utilisation">
+    <div class="row g-4 mb-4">
+      <div class="col-12 col-lg-8">
+        <div class="analytics-card">
+          <h6 class="text-uppercase text-muted fw-bold mb-4">Hall Usage Frequency (Top 8)</h6>
+          <div class="chart-container">
+            <canvas id="hallUsageChart"></canvas>
+          </div>
+        </div>
+      </div>
+      <div class="col-12 col-lg-4">
+        <div class="analytics-card">
+          <h6 class="text-uppercase text-muted fw-bold mb-4">Peak Booking Hours</h6>
+          <div class="chart-container">
+            <canvas id="peakHoursChart"></canvas>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <div class="row g-3">
+      <div class="col-12 col-md-4">
+        <div class="kpi-card">
+          <div class="kpi-icon text-danger bg-danger bg-opacity-10"><i class="bi bi-exclamation-triangle"></i></div>
+          <div class="kpi-value">{{ damage_total }}</div>
+          <div class="kpi-label">Total Damage Incidents</div>
+        </div>
+      </div>
+      <div class="col-12 col-md-4">
+        <div class="kpi-card">
+          <div class="kpi-icon text-warning bg-warning bg-opacity-10"><i class="bi bi-hourglass-split"></i></div>
+          <div class="kpi-value">{{ damage_pending }}</div>
+          <div class="kpi-label">Pending Damage Resolutions</div>
+        </div>
+      </div>
+      <div class="col-12 col-md-4">
+        <div class="kpi-card">
+          <div class="kpi-icon text-success bg-success bg-opacity-10"><i class="bi bi-shield-check"></i></div>
+          <div class="kpi-value">{{ damage_recovery }}%</div>
+          <div class="kpi-label">Damage Recovery Rate</div>
+        </div>
+      </div>
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- ==========================================
+       USERS TAB
+       ========================================== -->
+  {% if scope == "full" %}
+  <div class="evms-tab-content" id="tab-users">
+    <div class="row g-3 mb-4">
+      <div class="col-12 col-md-4">
+        <div class="kpi-card h-100">
+          <div class="kpi-icon text-primary bg-primary bg-opacity-10"><i class="bi bi-people"></i></div>
+          <div class="kpi-value">{{ users_total }}</div>
+          <div class="kpi-label">Total Users</div>
+        </div>
+      </div>
+      <div class="col-12 col-md-4">
+        <div class="kpi-card h-100">
+          <div class="kpi-icon text-success bg-success bg-opacity-10"><i class="bi bi-person-check"></i></div>
+          <div class="kpi-value">{{ users_active }}</div>
+          <div class="kpi-label">Active Users</div>
+        </div>
+      </div>
+      <div class="col-12 col-md-4">
+        <div class="kpi-card h-100">
+          <div class="kpi-icon text-info bg-info bg-opacity-10"><i class="bi bi-person-plus"></i></div>
+          <div class="kpi-value">{{ users_new_month }}</div>
+          <div class="kpi-label">New Users (This Month)</div>
+        </div>
+      </div>
+    </div>
+    <div class="alert alert-info">
+      <i class="bi bi-info-circle me-2"></i>Detailed user analytics and audit logs are available in the <a href="{% url 'reports:report_centre' %}" class="alert-link">Report Centre</a>.
+    </div>
+  </div>
+  {% endif %}
+
+</div>
+
+<!-- Scripts for Tabs and Charts -->
+<script>
+  function showTab(e, tabsId, bodyId) {
+    e.preventDefault();
+    const target = e.currentTarget.dataset.tab;
+    document.querySelectorAll('#' + tabsId + ' .evms-tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('#' + bodyId + ' .evms-tab-content').forEach(c => c.classList.remove('active'));
+    e.currentTarget.classList.add('active');
+    document.getElementById(target).classList.add('active');
+  }
+
+  // Chart.js Configuration
+  document.addEventListener("DOMContentLoaded", function() {
+    Chart.defaults.color = 'rgba(148,163,184,0.8)';
+    Chart.defaults.font.family = "'Inter', system-ui, -apple-system, sans-serif";
+    
+    // Helper for theme colours
+    const isDark = document.documentElement.getAttribute('data-bs-theme') !== 'light';
+    const gridColor = isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)';
+    
+    // 1. Trend Chart (Line)
+    const ctxTrend = document.getElementById('trendChart');
+    if(ctxTrend) {
+      new Chart(ctxTrend, {
+        type: 'line',
+        data: {
+          labels: {{ booking_month_labels|safe }},
+          datasets: [{
+            label: 'Bookings',
+            data: {{ booking_month_counts|safe }},
+            borderColor: '#60a5fa',
+            backgroundColor: 'rgba(96,165,250,0.1)',
+            borderWidth: 2,
+            tension: 0.4,
+            fill: true
+          }]
+        },
+        options: {
+          responsive: true, maintainAspectRatio: false,
+          plugins: { legend: { display: false } },
+          scales: {
+            x: { grid: { display: false } },
+            y: { grid: { color: gridColor }, beginAtZero: true }
+          }
+        }
+      });
+    }
+
+    // 2. Status Distribution (Doughnut)
+    const ctxStatus = document.getElementById('statusChart');
+    if(ctxStatus) {
+      new Chart(ctxStatus, {
+        type: 'doughnut',
+        data: {
+          labels: {{ status_labels|safe }},
+          datasets: [{
+            data: {{ status_counts|safe }},
+            backgroundColor: ['#4ade80', '#fbbf24', '#f87171', '#60a5fa', '#a78bfa', '#94a3b8'],
+            borderWidth: 0
+          }]
+        },
+        options: {
+          responsive: true, maintainAspectRatio: false,
+          plugins: { legend: { position: 'bottom', labels: { boxWidth: 12 } } },
+          cutout: '70%'
+        }
+      });
+    }
+
+    // 3. Revenue Chart (Area)
+    const ctxRev = document.getElementById('revenueChart');
+    if(ctxRev) {
+      new Chart(ctxRev, {
+        type: 'line',
+        data: {
+          labels: {{ revenue_labels|safe }},
+          datasets: [{
+            label: 'Revenue (₦)',
+            data: {{ revenue_totals|safe }},
+            borderColor: '#facc15',
+            backgroundColor: 'rgba(250,204,21,0.1)',
+            borderWidth: 2,
+            tension: 0.4,
+            fill: true
+          }]
+        },
+        options: {
+          responsive: true, maintainAspectRatio: false,
+          plugins: { legend: { display: false } },
+          scales: {
+            x: { grid: { display: false } },
+            y: { grid: { color: gridColor }, beginAtZero: true }
+          }
+        }
+      });
+    }
+
+    // 4. Hall Usage (Bar)
+    const ctxHall = document.getElementById('hallUsageChart');
+    if(ctxHall) {
+      new Chart(ctxHall, {
+        type: 'bar',
+        data: {
+          labels: {{ hall_usage_labels|safe }},
+          datasets: [{
+            label: 'Bookings',
+            data: {{ hall_usage_counts|safe }},
+            backgroundColor: '#818cf8',
+            borderRadius: 4
+          }]
+        },
+        options: {
+          responsive: true, maintainAspectRatio: false,
+          plugins: { legend: { display: false } },
+          scales: {
+            x: { grid: { display: false } },
+            y: { grid: { color: gridColor }, beginAtZero: true }
+          }
+        }
+      });
+    }
+
+    // 5. Purpose Chart (Bar)
+    const ctxPurpose = document.getElementById('purposeChart');
+    if(ctxPurpose) {
+      new Chart(ctxPurpose, {
+        type: 'bar',
+        data: {
+          labels: {{ purpose_labels|safe }},
+          datasets: [{
+            label: 'Events',
+            data: {{ purpose_counts|safe }},
+            backgroundColor: '#34d399',
+            borderRadius: 4
+          }]
+        },
+        options: {
+          indexAxis: 'y',
+          responsive: true, maintainAspectRatio: false,
+          plugins: { legend: { display: false } },
+          scales: {
+            x: { grid: { color: gridColor }, beginAtZero: true },
+            y: { grid: { display: false } }
+          }
+        }
+      });
+    }
+    
+    // 6. Payment Methods (Pie)
+    const ctxPay = document.getElementById('paymentMethodChart');
+    if(ctxPay) {
+      new Chart(ctxPay, {
+        type: 'pie',
+        data: {
+          labels: {{ pay_method_labels|safe }},
+          datasets: [{
+            data: {{ pay_method_counts|safe }},
+            backgroundColor: ['#60a5fa', '#facc15', '#4ade80'],
+            borderWidth: 0
+          }]
+        },
+        options: {
+          responsive: true, maintainAspectRatio: false,
+          plugins: { legend: { position: 'bottom' } }
+        }
+      });
+    }
+
+    // 7. Peak Hours (Line)
+    const ctxPeak = document.getElementById('peakHoursChart');
+    if(ctxPeak) {
+      new Chart(ctxPeak, {
+        type: 'line',
+        data: {
+          labels: {{ peak_labels|safe }},
+          datasets: [{
+            label: 'Bookings',
+            data: {{ peak_counts|safe }},
+            borderColor: '#c084fc',
+            backgroundColor: 'transparent',
+            borderWidth: 2,
+            tension: 0.3,
+            pointBackgroundColor: '#c084fc'
+          }]
+        },
+        options: {
+          responsive: true, maintainAspectRatio: false,
+          plugins: { legend: { display: false } },
+          scales: {
+            x: { grid: { display: false } },
+            y: { grid: { color: gridColor }, beginAtZero: true }
+          }
+        }
+      });
+    }
+  });
+</script>
+{% endblock %}

@@ -1,0 +1,170 @@
+{% extends "hall/base.html" %}
+{% block content %}
+
+<style>
+  .hall-card-img-wrap {
+    position: relative;
+    height: 190px;
+    overflow: hidden;
+    border-radius: 16px 16px 0 0;
+    background: #1a2540;
+  }
+  .hall-card-img-wrap img {
+    width: 100%; height: 100%;
+    object-fit: cover;
+    display: block;
+    transition: transform 0.35s ease;
+  }
+  .hall-card-img-wrap:hover img { transform: scale(1.04); }
+  .hall-card-gradient {
+    position: absolute; inset: 0;
+    background: linear-gradient(
+      to bottom,
+      rgba(0,0,0,0) 0%,
+      rgba(0,0,0,0.05) 40%,
+      rgba(0,0,0,0.58) 78%,
+      rgba(0,0,0,0.78) 100%
+    );
+    border-radius: 16px 16px 0 0;
+    pointer-events: none;
+  }
+  .hall-card-overlay-text {
+    position: absolute;
+    bottom: 0; left: 0; right: 0;
+    padding: 0.7rem 1rem 0.6rem;
+    z-index: 2;
+  }
+  .hall-card-overlay-text .hall-name {
+    font-size: 0.9rem; font-weight: 700;
+    color: #fff;
+    text-shadow: 0 1px 6px rgba(0,0,0,0.72);
+    margin-bottom: 2px;
+  }
+  .hall-card-overlay-text .hall-meta {
+    font-size: 0.68rem;
+    color: rgba(255,255,255,0.82);
+    text-shadow: 0 1px 4px rgba(0,0,0,0.6);
+    display: flex; gap: 0.5rem; flex-wrap: wrap; align-items: center;
+  }
+  .hall-no-img {
+    width: 100%; height: 100%;
+    display: flex; align-items: center; justify-content: center;
+    background: linear-gradient(135deg, #1a2540, #2b3f6b);
+  }
+</style>
+
+<div class="d-flex flex-wrap justify-content-between align-items-end gap-2 mb-3">
+  <div>
+    <h1 class="h4 mb-1">Available Halls</h1>
+    <div class="text-body-secondary">Browse and filter halls by category, capacity, price, or date.</div>
+  </div>
+</div>
+
+{# ── Advanced Filter Bar ── #}
+<div class="card app-card mb-4">
+  <div class="card-body">
+    <form method="get" id="hall-filter-form" class="row g-2 align-items-end">
+      <div class="col-12 col-md-3">
+        <label class="form-label small mb-1" for="hall-search">Search</label>
+        <div class="input-group input-group-sm">
+          <span class="input-group-text"><i class="bi bi-search"></i></span>
+          <input id="hall-search" class="form-control" type="text" name="q" value="{{ q }}" placeholder="Name, faculty, building…">
+        </div>
+      </div>
+      <div class="col-6 col-md-2">
+        <label class="form-label small mb-1" for="hall-category">Category</label>
+        <select id="hall-category" class="form-select form-select-sm" name="category">
+          <option value="">All categories</option>
+          {% for val, label in categories %}
+            <option value="{{ val }}" {% if category == val %}selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-6 col-md-2">
+        <label class="form-label small mb-1">Min capacity</label>
+        <input class="form-control form-control-sm" type="number" name="capacity_min" min="0"
+               placeholder="e.g. 50" value="{{ capacity_min|default:'' }}">
+      </div>
+      <div class="col-6 col-md-2">
+        <label class="form-label small mb-1">Max capacity</label>
+        <input class="form-control form-control-sm" type="number" name="capacity_max" min="0"
+               placeholder="e.g. 500" value="{{ capacity_max|default:'' }}">
+      </div>
+      <div class="col-6 col-md-2">
+        <label class="form-label small mb-1">Max rate (₦/day)</label>
+        <input class="form-control form-control-sm" type="number" name="rate_max" min="0"
+               placeholder="e.g. 50000" value="{{ rate_max|default:'' }}">
+      </div>
+      <div class="col-12 col-md-3">
+        <label class="form-label small mb-1" for="avail-date">Available on</label>
+        <input id="avail-date" class="form-control form-control-sm" type="date"
+               name="avail_date" value="{{ avail_date }}">
+      </div>
+      <div class="col-12 col-md-auto d-flex gap-2">
+        <button class="btn btn-success btn-sm px-3" type="submit">
+          <i class="bi bi-funnel"></i> Filter
+        </button>
+        <a class="btn btn-outline-secondary btn-sm px-3" href="{% url 'hall:hall_list' %}">
+          <i class="bi bi-x-circle"></i> Clear
+        </a>
+      </div>
+    </form>
+  </div>
+</div>
+
+{# ── Results ── #}
+<div class="row g-3">
+  {% for hall in halls %}
+    <div class="col-md-6 col-lg-4">
+      <div class="card app-card h-100 hover-lift overflow-hidden">
+        {% with hall.cover_image as cover %}
+        <div class="hall-card-img-wrap">
+          {% if cover %}
+            <img src="{{ cover.image.url }}" alt="{{ hall.name }}" loading="lazy">
+          {% elif hall.image %}
+            <img src="{{ hall.image.url }}" alt="{{ hall.name }}" loading="lazy">
+          {% else %}
+            <div class="hall-no-img">
+              <i class="bi bi-building text-white" style="font-size:2.5rem;opacity:0.35;"></i>
+            </div>
+          {% endif %}
+          <div class="hall-card-gradient"></div>
+          <div class="hall-card-overlay-text">
+            <div class="hall-name">{{ hall.name }}</div>
+            <div class="hall-meta">
+              <span><i class="bi bi-people"></i> {{ hall.capacity }} seats</span>
+              {% if hall.daily_rate %}
+                <span><i class="bi bi-cash-coin"></i> ₦{{ hall.daily_rate }}/day</span>
+              {% else %}
+                <span class="opacity-75">Rate: TBD</span>
+              {% endif %}
+              <span class="badge" style="background:rgba(255,255,255,0.18);font-size:0.6rem;">
+                {{ hall.get_category_display }}
+              </span>
+            </div>
+          </div>
+        </div>
+        {% endwith %}
+        <div class="card-body pt-2 pb-1">
+          <div class="text-body-secondary small">
+            <i class="bi bi-geo-alt"></i> {{ hall.location_description|default:hall.faculty }}
+          </div>
+        </div>
+        <div class="card-footer bg-transparent border-0 pt-0">
+          <a class="btn btn-outline-success w-100" href="{% url 'hall:hall_detail' hall.pk %}">
+            <i class="bi bi-eye"></i> View details
+          </a>
+        </div>
+      </div>
+    </div>
+  {% empty %}
+    <div class="col-12">
+      <div class="alert alert-secondary text-center py-4">
+        <i class="bi bi-building-x d-block mb-2" style="font-size:2rem;"></i>
+        No halls match your search criteria.
+        <a href="{% url 'hall:hall_list' %}" class="alert-link">Clear filters</a>
+      </div>
+    </div>
+  {% endfor %}
+</div>
+{% endblock %}

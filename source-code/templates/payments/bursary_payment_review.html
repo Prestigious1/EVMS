@@ -1,0 +1,432 @@
+{% extends "hall/base.html" %}
+{% load static %}
+
+{% block title %}Bursary Payment Review — {{ reservation.booking_reference }}{% endblock %}
+{% block nav_bursary %}active{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+
+  {# ── Page Header ─────────────────────────────────────────── #}
+  <div class="d-flex flex-wrap justify-content-between align-items-start mb-4 gap-3">
+    <div>
+      <h1 class="h3 mb-0">
+        <i class="bi bi-bank text-success me-2"></i>
+        Bursary Payment Review
+      </h1>
+      <div class="text-body-secondary small mt-1">
+        Booking: <strong class="font-monospace text-primary">{{ reservation.booking_reference }}</strong>
+        &nbsp;|&nbsp;
+        <span class="badge
+          {% if reservation.case_status == BookingCaseStatus.UNDER_BURSARY_VERIFICATION %}bg-warning text-dark
+          {% elif reservation.case_status == BookingCaseStatus.PAYMENT_VERIFIED %}bg-success
+          {% elif reservation.case_status == BookingCaseStatus.PAYMENT_REJECTED %}bg-danger
+          {% else %}bg-secondary{% endif %}">
+          {{ reservation.get_case_status_display_label }}
+        </span>
+      </div>
+    </div>
+    <div class="d-flex gap-2 flex-wrap">
+      <a href="{% url 'reservations:bursary_dashboard' %}" class="btn btn-outline-secondary btn-sm">
+        <i class="bi bi-arrow-left me-1"></i> Back to Bursary Dashboard
+      </a>
+      <a href="{% url 'reservations:detail' booking_reference=reservation.booking_reference %}" class="btn btn-outline-primary btn-sm">
+        <i class="bi bi-folder2-open me-1"></i> Full Booking Case
+      </a>
+      <a href="{% url 'payments:enterprise_receipt_pdf' booking_reference=reservation.booking_reference %}" class="btn btn-success btn-sm" target="_blank">
+        <i class="bi bi-download me-1"></i> Download Official Receipt
+      </a>
+    </div>
+  </div>
+
+  {# ── Django messages ── #}
+  {% if messages %}
+    {% for msg in messages %}
+    <div class="alert alert-{{ msg.tags|default:'info' }} alert-dismissible fade show small" role="alert">
+      {{ msg }}
+      <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+    {% endfor %}
+  {% endif %}
+
+  <div class="row g-4">
+
+    {# ══════════════ LEFT: Receipt + Financial Breakdown ══════════════ #}
+    <div class="col-lg-7">
+
+      {# ── A4 Receipt Panel ── #}
+      <div class="card shadow-sm border-0 mb-4" style="border-left: 4px solid #1a5e2f !important;">
+        <div class="card-header d-flex justify-content-between align-items-center" style="background: #1a5e2f;">
+          <div class="text-white">
+            <i class="bi bi-receipt me-2"></i>
+            <strong>Official Payment Receipt</strong>
+            <span class="badge bg-light text-dark ms-2 small">System Generated</span>
+          </div>
+          <a href="{% url 'payments:enterprise_receipt_pdf' booking_reference=reservation.booking_reference %}" class="btn btn-sm btn-light">
+            <i class="bi bi-printer me-1"></i>Print / Download
+          </a>
+        </div>
+        <div class="card-body p-4 text-dark" style="font-family: 'Courier New', monospace; font-size: 0.85rem; background: #fafff9; color: #212529 !important;">
+
+          {# University Header #}
+          <div class="text-center mb-3 pb-3 border-bottom">
+            <img src="{% static 'images/lasu_logo.png' %}" alt="LASU Logo" style="height: 60px; width: auto;" class="mb-2">
+            <div class="fw-bold fs-5" style="color: #1a5e2f;">LAGOS STATE UNIVERSITY</div>
+            <div class="text-dark opacity-75 small" style="color: #6c757d !important;">Event Hall Management System — Financial Services</div>
+            <div class="fw-bold mt-1">OFFICIAL PAYMENT RECEIPT</div>
+          </div>
+
+          {# Receipt Metadata #}
+          <div class="row g-2 mb-3">
+            <div class="col-6">
+              <div class="bg-light p-2 rounded small">
+                <div class="text-dark opacity-75">Booking Reference</div>
+                <div class="fw-bold font-monospace">{{ reservation.booking_reference }}</div>
+              </div>
+            </div>
+            <div class="col-6">
+              <div class="bg-light p-2 rounded small">
+                <div class="text-dark opacity-75">Payment Method</div>
+                <div class="fw-bold">
+                  {% if booking_payment %}{{ booking_payment.get_payment_method_display }}{% else %}—{% endif %}
+                </div>
+              </div>
+            </div>
+            <div class="col-6">
+              <div class="bg-light p-2 rounded small">
+                <div class="text-dark opacity-75">Payment Reference</div>
+                <div class="fw-bold font-monospace">
+                  {% if latest_proof %}{{ latest_proof.transaction_ref|default:"—" }}
+                  {% elif booking_payment %}{{ booking_payment.transaction_reference|default:booking_payment.paystack_reference|default:"—" }}
+                  {% else %}—{% endif %}
+                </div>
+              </div>
+            </div>
+            <div class="col-6">
+              <div class="bg-light p-2 rounded small">
+                <div class="text-dark opacity-75">Payment Date</div>
+                <div class="fw-bold">
+                  {% if booking_payment %}{{ booking_payment.created_at|date:"d M Y H:i" }}{% else %}—{% endif %}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {# Applicant & Booking #}
+          <div class="mb-3 p-3 border rounded" style="background: #f0f7f2;">
+            <div class="fw-bold small text-uppercase text-dark opacity-75 mb-2">Applicant Information</div>
+            <div class="row g-1 small">
+              <div class="col-4 text-dark opacity-75">Full Name</div>
+              <div class="col-8 fw-semibold">{{ reservation.user.get_full_name|default:reservation.user.username }}</div>
+              <div class="col-4 text-dark opacity-75">Email</div>
+              <div class="col-8">{{ reservation.user.email }}</div>
+              <div class="col-4 text-dark opacity-75">Role</div>
+              <div class="col-8"><span class="badge bg-secondary">{{ reservation.user.role }}</span></div>
+              {% if reservation.user.department %}
+              <div class="col-4 text-dark opacity-75">Dept</div>
+              <div class="col-8">{{ reservation.user.department }}</div>
+              {% endif %}
+            </div>
+          </div>
+
+          <div class="mb-3 p-3 border rounded" style="background: #f0f7f2;">
+            <div class="fw-bold small text-uppercase text-dark opacity-75 mb-2">Booking Information</div>
+            <div class="row g-1 small">
+              <div class="col-4 text-dark opacity-75">Hall</div>
+              <div class="col-8 fw-semibold">{{ reservation.hall.name }}</div>
+              <div class="col-4 text-dark opacity-75">Event</div>
+              <div class="col-8">{{ reservation.event_name|default:"—" }}</div>
+              <div class="col-4 text-dark opacity-75">Date</div>
+              <div class="col-8">{{ reservation.booking_date|date:"d M Y" }}</div>
+              <div class="col-4 text-dark opacity-75">Time</div>
+              <div class="col-8">{{ reservation.start_time|time:"H:i" }} – {{ reservation.end_time|time:"H:i" }}</div>
+            </div>
+          </div>
+
+          {# Financial Breakdown #}
+          <div class="mb-3 p-3 border rounded">
+            <div class="fw-bold small text-uppercase text-dark opacity-75 mb-2" style="color: #1a5e2f !important;">Financial Breakdown</div>
+            <table class="table table-sm mb-0" style="font-size:0.82rem;">
+              <tbody>
+                <tr>
+                  <td class="text-dark opacity-75">Original Hall Price</td>
+                  <td class="text-end fw-semibold">₦{{ hall_price|floatformat:2 }}</td>
+                </tr>
+                {% if coupon_code and coupon_discount %}
+                <tr class="text-success">
+                  <td>Coupon Applied ({{ coupon_code }})</td>
+                  <td class="text-end">− ₦{{ coupon_discount|floatformat:2 }}</td>
+                </tr>
+                {% endif %}
+                {% if discount_amount %}
+                <tr class="text-success">
+                  <td>Additional Discount</td>
+                  <td class="text-end">− ₦{{ discount_amount|floatformat:2 }}</td>
+                </tr>
+                {% endif %}
+                {% if security_dep %}
+                <tr>
+                  <td>Security Deposit</td>
+                  <td class="text-end">₦{{ security_dep|floatformat:2 }}</td>
+                </tr>
+                {% endif %}
+                {% if extra_charges %}
+                <tr>
+                  <td>Additional Charges</td>
+                  <td class="text-end">₦{{ extra_charges|floatformat:2 }}</td>
+                </tr>
+                {% endif %}
+                {% if vat_amount %}
+                <tr>
+                  <td>VAT</td>
+                  <td class="text-end">₦{{ vat_amount|floatformat:2 }}</td>
+                </tr>
+                {% endif %}
+                <tr class="table-success fw-bold">
+                  <td>Total Expected Amount</td>
+                  <td class="text-end fs-6">₦{{ total_amount|floatformat:2 }}</td>
+                </tr>
+                <tr class="table-primary fw-bold">
+                  <td>Amount Paid</td>
+                  <td class="text-end fs-6">₦{{ amount_paid|floatformat:2 }}</td>
+                </tr>
+                {% if difference != 0 %}
+                <tr class="{% if difference > 0 %}table-danger{% else %}table-success{% endif %} fw-semibold">
+                  <td>Difference</td>
+                  <td class="text-end">{% if difference > 0 %}Shortfall{% else %}Excess{% endif %}: ₦{{ difference|floatformat:2 }}</td>
+                </tr>
+                {% endif %}
+                <tr class="{% if outstanding > 0 %}table-warning{% else %}table-success{% endif %}">
+                  <td class="fw-semibold">Outstanding Balance</td>
+                  <td class="text-end fw-semibold">₦{{ outstanding|floatformat:2 }}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          {# Verification Status #}
+          {% if latest_proof %}
+          <div class="p-2 rounded border small {% if latest_proof.status == 'VERIFIED' %}border-success bg-success bg-opacity-10{% elif latest_proof.status == 'REJECTED' %}border-danger bg-danger bg-opacity-10{% else %}border-warning bg-warning bg-opacity-10{% endif %}">
+            <div class="fw-semibold mb-1">
+              {% if latest_proof.status == 'VERIFIED' %}
+                <i class="bi bi-check-circle-fill text-success me-1"></i>Payment Verified
+              {% elif latest_proof.status == 'REJECTED' %}
+                <i class="bi bi-x-circle-fill text-danger me-1"></i>Payment Rejected
+              {% else %}
+                <i class="bi bi-hourglass-split text-warning me-1"></i>Awaiting Verification
+              {% endif %}
+            </div>
+            {% if latest_proof.verified_by %}
+            <div>Verified by: <strong>{{ latest_proof.verified_by.get_full_name|default:latest_proof.verified_by.email }}</strong></div>
+            {% endif %}
+            {% if latest_proof.verified_at %}
+            <div>Date: {{ latest_proof.verified_at|date:"d M Y H:i" }}</div>
+            {% endif %}
+            {% if latest_proof.bursary_notes %}
+            <div>Notes: {{ latest_proof.bursary_notes }}</div>
+            {% endif %}
+          </div>
+          {% endif %}
+
+        </div>
+      </div>
+
+      {# ── Payment Evidence (Uploaded Files) ── #}
+      <div class="card shadow-sm border-0 mb-4">
+        <div class="card-header bg-body border-bottom py-3">
+          <h6 class="mb-0"><i class="bi bi-paperclip me-1"></i>Payment Evidence</h6>
+        </div>
+        <div class="card-body p-3">
+          {% if booking_proofs %}
+            {% for proof in booking_proofs %}
+            <div class="d-flex align-items-start gap-3 p-3 mb-2 border rounded {% if proof.status == 'VERIFIED' %}border-success bg-success bg-opacity-10{% elif proof.status == 'REJECTED' %}border-danger bg-danger bg-opacity-10{% else %}border-warning{% endif %}">
+              <div class="flex-shrink-0">
+                <i class="bi bi-file-earmark-image fs-3 {% if proof.status == 'VERIFIED' %}text-success{% elif proof.status == 'REJECTED' %}text-danger{% else %}text-warning{% endif %}"></i>
+              </div>
+              <div class="flex-grow-1 small">
+                <div class="fw-semibold">{{ proof.get_status_display }}</div>
+                <div class="text-dark opacity-75">Reference: <code>{{ proof.transaction_ref|default:"—" }}</code></div>
+                <div class="text-dark opacity-75">Amount Claimed: <strong>₦{{ proof.amount_claimed|floatformat:2 }}</strong></div>
+                <div class="text-dark opacity-75">Uploaded: {{ proof.uploaded_at|date:"d M Y H:i" }}</div>
+                {% if proof.bursary_notes %}
+                <div class="text-muted">Bursary Notes: {{ proof.bursary_notes }}</div>
+                {% endif %}
+              </div>
+              {% if proof.receipt_file %}
+              <div class="flex-shrink-0">
+                <a href="{{ proof.receipt_file.url }}" class="btn btn-sm btn-outline-primary" target="_blank">
+                  <i class="bi bi-eye me-1"></i>View
+                </a>
+              </div>
+              {% endif %}
+            </div>
+            {% endfor %}
+          {% else %}
+            <div class="text-muted small py-3 text-center">
+              <i class="bi bi-info-circle me-1"></i>No uploaded payment evidence on file.
+            </div>
+          {% endif %}
+        </div>
+      </div>
+
+    </div>
+
+    {# ══════════════ RIGHT: Actions, Timeline, Audit ══════════════ #}
+    <div class="col-lg-5">
+
+      {# ── Bursary Action Panel ── #}
+      {% if reservation.case_status == BookingCaseStatus.UNDER_BURSARY_VERIFICATION %}
+      <div class="card shadow-sm border-0 mb-4 border-start border-warning border-4">
+        <div class="card-header bg-warning bg-opacity-10 border-bottom">
+          <h6 class="mb-0 text-warning-emphasis"><i class="bi bi-shield-check me-1"></i>Bursary Actions</h6>
+        </div>
+        <div class="card-body p-3">
+          <p class="small text-muted mb-3">
+            Review the payment evidence and financial breakdown above, then take one of the following actions.
+          </p>
+
+          {# Approve #}
+          <form method="post" action="{% url 'reservations:bursary_action' reservation.booking_reference %}" class="mb-3">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="verify_payment">
+            <div class="mb-2">
+              <label class="form-label small fw-semibold">Verification Notes (for Approve)</label>
+              <textarea name="notes" rows="2" class="form-control form-control-sm" placeholder="e.g., Payment confirmed against bank records. Amount matches invoice."></textarea>
+            </div>
+            <button type="submit" class="btn btn-success w-100 fw-semibold"
+              onclick="return confirm('Approve this payment? This will move the booking to AWAITING_FINAL_APPROVAL.')">
+              <i class="bi bi-check-circle me-1"></i>Approve Payment
+            </button>
+          </form>
+
+          <hr>
+
+          {# Reject #}
+          <form method="post" action="{% url 'reservations:bursary_action' reservation.booking_reference %}" class="mb-3">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="reject_payment">
+            <div class="mb-2">
+              <label class="form-label small fw-semibold text-danger">Rejection Reason (required)</label>
+              <textarea name="notes" rows="2" class="form-control form-control-sm border-danger" placeholder="Reason for rejection..." required></textarea>
+            </div>
+            <button type="submit" class="btn btn-danger w-100 fw-semibold"
+              onclick="return confirm('Reject this payment? The applicant will be required to re-upload.')">
+              <i class="bi bi-x-circle me-1"></i>Reject Payment
+            </button>
+          </form>
+
+          <hr>
+
+          {# Request Clarification #}
+          <form method="post" action="{% url 'reservations:bursary_action' reservation.booking_reference %}">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="request_clarification">
+            <div class="mb-2">
+              <label class="form-label small fw-semibold">Clarification Request</label>
+              <textarea name="notes" rows="2" class="form-control form-control-sm" placeholder="What clarification do you need from the applicant?"></textarea>
+            </div>
+            <button type="submit" class="btn btn-outline-warning w-100 fw-semibold">
+              <i class="bi bi-question-circle me-1"></i>Request Clarification
+            </button>
+          </form>
+        </div>
+      </div>
+      {% else %}
+      <div class="card shadow-sm border-0 mb-4">
+        <div class="card-body p-3 text-center text-muted small">
+          <i class="bi bi-info-circle fs-3 d-block mb-2"></i>
+          Bursary verification actions are only available when the booking is
+          <strong>Under Bursary Verification</strong>.
+          <div class="mt-2">
+            Current status:
+            <span class="badge bg-secondary">{{ reservation.get_case_status_display_label }}</span>
+          </div>
+        </div>
+      </div>
+      {% endif %}
+
+      {# ── Timeline ── #}
+      <div class="card shadow-sm border-0 mb-4">
+        <div class="card-header bg-body border-bottom py-3">
+          <h6 class="mb-0"><i class="bi bi-clock-history me-1"></i>Payment Timeline</h6>
+        </div>
+        <div class="card-body p-3" style="max-height: 320px; overflow-y: auto;">
+          <div class="timeline-wrapper ms-2 border-start border-2 border-success ps-3 position-relative">
+            {% for event in reservation.timeline_events.all %}
+              {% if "PAYMENT" in event.event_type or "BURSARY" in event.event_type or "BILLING" in event.event_type %}
+              <div class="mb-3 position-relative">
+                <div class="position-absolute translate-middle-x rounded-circle
+                  {% if 'VERIFIED' in event.event_type %}bg-success
+                  {% elif 'REJECTED' in event.event_type %}bg-danger
+                  {% else %}bg-warning{% endif %}"
+                  style="width: 10px; height: 10px; left: -1.5rem; top: 0.3rem;"></div>
+                <div class="small fw-semibold">{{ event.title }}</div>
+                <div class="text-muted" style="font-size:0.75rem;">{{ event.timestamp|date:"d M Y H:i" }}</div>
+                {% if event.description %}
+                  <div class="text-muted small mt-1">{{ event.description }}</div>
+                {% endif %}
+              </div>
+              {% endif %}
+            {% empty %}
+              <div class="text-muted small">No payment timeline events yet.</div>
+            {% endfor %}
+          </div>
+        </div>
+      </div>
+
+      {# ── Communication Thread ── #}
+      <div class="card shadow-sm border-0 mb-4">
+        <div class="card-header bg-body border-bottom py-3">
+          <h6 class="mb-0"><i class="bi bi-chat-dots me-1"></i>Communication Thread</h6>
+        </div>
+        <div class="card-body p-3">
+          <div class="vstack gap-2 mb-3" style="max-height: 260px; overflow-y: auto;">
+            {% for msg in thread_messages %}
+              <div class="d-flex flex-column {% if msg.sender == request.user %}align-items-end{% else %}align-items-start{% endif %}">
+                <div class="px-3 py-2 rounded-3 {% if msg.is_staff_note %}bg-warning-subtle{% elif msg.sender == request.user %}bg-success text-white{% else %}bg-body border{% endif %}" style="max-width:85%; font-size:0.82rem;">
+                  <div class="small fw-bold mb-1 {% if msg.sender == request.user and not msg.is_staff_note %}text-white-50{% else %}text-muted{% endif %}">
+                    {{ msg.sender.get_full_name|default:msg.sender.username }}
+                  </div>
+                  {{ msg.content|linebreaksbr }}
+                </div>
+                <div class="text-muted mt-1" style="font-size:0.7rem;">{{ msg.created_at|date:"d M H:i" }}</div>
+              </div>
+            {% empty %}
+              <div class="text-muted small text-center">No messages yet.</div>
+            {% endfor %}
+          </div>
+          <form method="post" action="{% url 'reservations:add_thread_message' reservation.booking_reference %}">
+            {% csrf_token %}
+            <input type="hidden" name="target_roles" value="APPLICANT,VENTURES">
+            <div class="input-group input-group-sm">
+              <textarea name="content" rows="1" class="form-control" placeholder="Write a message..." required></textarea>
+              <button type="submit" class="btn btn-success">Send</button>
+            </div>
+          </form>
+        </div>
+      </div>
+
+      {# ── Audit History ── #}
+      <div class="card shadow-sm border-0">
+        <div class="card-header bg-body border-bottom py-3">
+          <h6 class="mb-0"><i class="bi bi-journal-text me-1"></i>Audit History</h6>
+        </div>
+        <div class="card-body p-3" style="max-height: 260px; overflow-y: auto;">
+          {% for log in audit_logs %}
+          <div class="d-flex gap-2 mb-2 small border-bottom pb-2">
+            <div class="text-muted" style="min-width:90px; font-size:0.72rem;">{{ log.timestamp|date:"d M H:i" }}</div>
+            <div>
+              <span class="badge bg-secondary me-1" style="font-size:0.65rem;">{{ log.model_name }}</span>
+              {{ log.action }}
+            </div>
+          </div>
+          {% empty %}
+          <div class="text-muted small">No audit records.</div>
+          {% endfor %}
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+{% endblock %}

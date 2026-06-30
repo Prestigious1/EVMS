@@ -1,0 +1,332 @@
+{% extends "hall/base.html" %}
+{% block title %}Payment Authorization | {{ reservation.booking_reference }}{% endblock %}
+
+{% block content %}
+<div class="page-header mb-4">
+  <div class="d-flex align-items-center gap-3">
+    <a href="{% url 'reservations:detail' reservation.booking_reference %}" class="btn btn-sm btn-outline-secondary">
+      <i class="bi bi-arrow-left"></i> Back
+    </a>
+    <div>
+      <h1 class="h3 mb-0">Payment Authorization</h1>
+      <p class="text-muted mb-0">Ref: <strong>{{ reservation.booking_reference }}</strong> — {{ reservation.hall.name }}</p>
+    </div>
+  </div>
+  <span class="badge bg-warning text-dark px-3 py-2 fs-6 border border-warning-subtle shadow-sm">
+    {{ stage_label }}
+  </span>
+</div>
+
+{% if is_awaiting_payment %}
+<div class="alert alert-info d-flex align-items-center">
+  <i class="bi bi-info-circle-fill me-2 fs-5"></i>
+  <div>
+    <strong>Payment Request Sent.</strong> The applicant has been notified and is expected to pay by 
+    {{ auth.payment_deadline|date:"d M Y H:i"|default:"the deadline" }}.
+  </div>
+</div>
+{% endif %}
+
+<div class="row g-4">
+  {# ── LEFT COLUMN ──────────────────────────────────────────────────────── #}
+  <div class="col-lg-7">
+    
+    {# Booking & Hall Profile #}
+    <div class="card mb-4 shadow-sm border-0">
+      <div class="card-header bg-body-tertiary border-bottom-0 pt-3 pb-2">
+        <h5 class="mb-0 text-body-emphasis"><i class="bi bi-info-square text-secondary me-2"></i>Booking &amp; Hall Profile</h5>
+      </div>
+      <div class="card-body">
+        <h6 class="text-uppercase text-muted small fw-bold mb-3 border-bottom pb-2">Applicant Details</h6>
+        <div class="row g-3 mb-4">
+          <div class="col-sm-6">
+            <span class="text-muted small d-block">Name</span>
+            <strong>{{ reservation.user.get_full_name|default:reservation.user.username }}</strong>
+          </div>
+          <div class="col-sm-6">
+            <span class="text-muted small d-block">Department/Organisation</span>
+            <strong>{{ reservation.requesting_department|default:"N/A" }}</strong>
+          </div>
+          <div class="col-sm-6">
+            <span class="text-muted small d-block">Event Purpose</span>
+            <strong>{{ reservation.purpose }}</strong>
+          </div>
+          <div class="col-sm-6">
+            <span class="text-muted small d-block">Event Dates</span>
+            <strong>{{ reservation.booking_date|date:"d M Y" }}</strong> ({{ reservation.start_time|time:"H:i" }} - {{ reservation.end_time|time:"H:i" }})
+          </div>
+        </div>
+
+        <h6 class="text-uppercase text-muted small fw-bold mb-3 border-bottom pb-2">Hall Default Pricing</h6>
+        <div class="row g-3">
+          <div class="col-sm-4">
+            <span class="text-muted small d-block">Base Daily Rate</span>
+            <strong>₦{{ reservation.hall.daily_rate|stringformat:".2f" }}</strong>
+          </div>
+          <div class="col-sm-4">
+            <span class="text-muted small d-block">Default Security Deposit</span>
+            <strong>₦{{ reservation.hall.security_deposit|stringformat:".2f" }}</strong>
+          </div>
+          <div class="col-sm-4">
+            <span class="text-muted small d-block">Extra Hour Charge</span>
+            <strong>₦{{ reservation.hall.extra_hour_charge|stringformat:".2f" }} / hr</strong>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    {# Coupon Review #}
+    <div class="card mb-4 shadow-sm border-0 border-top border-4 border-info">
+      <div class="card-header bg-body-tertiary border-bottom-0 pt-3 pb-2 d-flex justify-content-between align-items-center">
+        <h5 class="mb-0 text-body-emphasis"><i class="bi bi-ticket-perforated text-info me-2"></i>Coupon Review</h5>
+      </div>
+      <div class="card-body">
+        {% if reservation.coupon_code %}
+          <div class="d-flex align-items-start gap-3 bg-body-tertiary rounded p-3 mb-3 border">
+            <div class="fs-1 text-info"><i class="bi bi-tags"></i></div>
+            <div class="flex-grow-1">
+              <h6 class="mb-1 text-uppercase fw-bold text-body-emphasis">{{ reservation.coupon_code }}</h6>
+              <div class="text-muted small mb-2">
+                Requested by applicant.
+                {% if coupon_obj %}
+                  Valid. Discount: {% if coupon_obj.discount_type == 'PERCENTAGE' %}{{ coupon_obj.value }}%{% else %}₦{{ coupon_obj.value }}{% endif %}
+                {% else %}
+                  <span class="text-danger"><i class="bi bi-exclamation-triangle"></i> Invalid or inactive coupon.</span>
+                {% endif %}
+              </div>
+              <div class="badge {% if reservation.coupon_status == 'APPROVED' %}bg-success{% elif reservation.coupon_status == 'REJECTED' %}bg-danger{% else %}bg-secondary{% endif %}">
+                Current Status: {{ reservation.coupon_status|default:"PENDING" }}
+              </div>
+            </div>
+          </div>
+        {% else %}
+          <div class="text-muted mb-3"><i class="bi bi-info-circle me-1"></i>No coupon was requested by the applicant.</div>
+        {% endif %}
+
+        {% if not is_awaiting_payment %}
+        <div class="d-flex align-items-end gap-2 flex-wrap mb-2">
+          <div class="w-100 text-muted small mb-1"><i class="bi bi-info-circle me-1"></i>Select an action (processed when you submit the payment authorization form).</div>
+          <div class="flex-grow-1" style="min-width: 150px;">
+            <label class="form-label small">Action</label>
+            <select class="form-select form-select-sm" name="coupon_action" id="couponActionSelect" onchange="handleCouponActionChange()" form="authForm">
+              <option value="">-- Do Nothing --</option>
+              <option value="APPROVED" data-discount-val="{{ coupon_obj.value|default:0 }}" data-discount-type="{{ coupon_obj.discount_type|default:'FIXED_AMOUNT' }}">Approve (Apply Discount)</option>
+              <option value="REJECTED">Reject Coupon</option>
+              <option value="REMOVED">Remove Coupon</option>
+              <option value="REPLACED">Replace Coupon</option>
+            </select>
+          </div>
+          <div class="flex-grow-1 d-none" id="newCouponContainer" style="min-width: 150px;">
+            <label class="form-label small">New Code</label>
+            <input type="text" class="form-control form-control-sm text-uppercase" name="new_coupon_code" placeholder="Enter new code" form="authForm">
+          </div>
+          <div class="flex-grow-1" style="min-width: 200px;">
+            <label class="form-label small">Notes (optional)</label>
+            <input type="text" class="form-control form-control-sm" name="coupon_action_notes" placeholder="Reason for action..." form="authForm">
+          </div>
+        </div>
+        {% endif %}
+      </div>
+    </div>
+
+    {# Coupon Action History #}
+    {% if coupon_action_logs %}
+    <div class="card mb-4 shadow-sm border-0">
+      <div class="card-header bg-body-tertiary border-bottom-0 pt-3 pb-2">
+        <h6 class="mb-0 text-muted"><i class="bi bi-clock-history me-2"></i>Coupon Action History</h6>
+      </div>
+      <div class="card-body p-0">
+        <div class="table-responsive">
+          <table class="table table-sm table-hover mb-0 font-monospace text-muted small">
+            <tbody>
+              {% for log in coupon_action_logs %}
+              <tr>
+                <td class="ps-3">{{ log.created_at|date:"d/m/y H:i" }}</td>
+                <td>{{ log.get_action_display }}</td>
+                <td>
+                  {% if log.old_code %}<del>{{ log.old_code }}</del> → {% endif %}
+                  <strong>{{ log.coupon_code }}</strong>
+                </td>
+                <td>{{ log.actor.get_full_name|default:log.actor.username|default:"System" }}</td>
+                <td class="pe-3 text-truncate" style="max-width: 150px;" title="{{ log.notes }}">{{ log.notes }}</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+    {% endif %}
+
+  </div>
+
+  {# ── RIGHT COLUMN ─────────────────────────────────────────────────────── #}
+  <div class="col-lg-5">
+    
+    <div class="card shadow border-0 border-top border-4 border-success sticky-top" style="top: 1rem; z-index: 10;">
+      <div class="card-header bg-body-tertiary border-bottom pt-3 pb-2">
+        <h5 class="mb-0 text-body-emphasis"><i class="bi bi-receipt text-success me-2"></i>Final Payment Authorization</h5>
+      </div>
+      <div class="card-body">
+        <form method="POST" action="{% url 'reservations:submit_payment_authorization' reservation.booking_reference %}" id="authForm">
+          {% csrf_token %}
+          
+          {# The JS calculation script will hook into these inputs to auto-update #}
+          <div class="d-flex justify-content-between align-items-center mb-2">
+            <span class="text-muted">Hall Price (₦)</span>
+            <input type="number" class="form-control form-control-sm text-end w-50 calc-input" name="hall_price" value="{{ auth.hall_price|stringformat:'.2f' }}" step="0.01" min="0" {% if is_awaiting_payment %}readonly{% endif %}>
+          </div>
+          
+          <div class="d-flex justify-content-between align-items-center mb-2">
+            <span class="text-muted">Security Deposit (₦)</span>
+            <input type="number" class="form-control form-control-sm text-end w-50 calc-input" name="security_deposit" value="{{ auth.security_deposit|stringformat:'.2f' }}" step="0.01" min="0" {% if is_awaiting_payment %}readonly{% endif %}>
+          </div>
+          
+          <div class="d-flex justify-content-between align-items-center mb-2">
+            <span class="text-muted">Extra Charges (₦)</span>
+            <div class="input-group input-group-sm w-50">
+              <input type="number" class="form-control text-end calc-input" name="extra_charges" value="{{ auth.extra_charges|stringformat:'.2f' }}" step="0.01" min="0" {% if is_awaiting_payment %}readonly{% endif %}>
+            </div>
+          </div>
+          <div class="mb-2 pe-1">
+            <input type="text" class="form-control form-control-sm w-100 bg-body-tertiary" name="extra_charges_notes" placeholder="Specify what extra charges are for..." value="{{ auth.extra_charges_notes }}" {% if is_awaiting_payment %}readonly{% endif %}>
+          </div>
+
+          <div class="d-flex justify-content-between align-items-center mb-2">
+            <span class="text-muted">Coupon Discount (₦)</span>
+            <input type="number" class="form-control form-control-sm text-end w-50 calc-input text-danger" name="coupon_discount" value="{{ auth.coupon_discount|stringformat:'.2f' }}" step="0.01" min="0" {% if is_awaiting_payment %}readonly{% endif %}>
+          </div>
+
+          <div class="d-flex justify-content-between align-items-center mb-2">
+            <span class="text-muted">Other Discount (₦)</span>
+            <input type="number" class="form-control form-control-sm text-end w-50 calc-input text-danger" name="discount_amount" value="{{ auth.discount_amount|stringformat:'.2f' }}" step="0.01" min="0" {% if is_awaiting_payment %}readonly{% endif %}>
+          </div>
+
+          <div class="d-flex justify-content-between align-items-center mb-3">
+            <span class="text-muted">VAT Rate (%)</span>
+            <input type="number" class="form-control form-control-sm text-end w-50 calc-input" name="vat_rate" value="{{ auth.vat_rate|stringformat:'.2f' }}" step="0.01" min="0" {% if is_awaiting_payment %}readonly{% endif %}>
+          </div>
+
+          <hr>
+
+          <div class="d-flex justify-content-between align-items-center mb-3">
+            <span class="fs-5 fw-bold text-dark">Total Payable</span>
+            <span class="fs-4 fw-bold text-success">₦<span id="displayTotalAmount">0.00</span></span>
+            <input type="hidden" name="total_amount" id="inputTotalAmount" value="{{ auth.total_amount }}">
+          </div>
+
+          {# We inject the coupon form values here if it hasn't been submitted #}
+          {% if not is_awaiting_payment %}
+          <div id="couponHiddenInputs"></div>
+          {% endif %}
+
+          <div class="mb-3">
+            <label class="form-label fw-bold">Payment Deadline</label>
+            <select class="form-select" name="deadline_type" id="deadlineSelect" onchange="toggleCustomDeadline()" {% if is_awaiting_payment %}disabled{% endif %}>
+              {% for val, label in deadline_types %}
+                <option value="{{ val }}" {% if auth.deadline_type == val %}selected{% endif %}>{{ label }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          
+          <div class="mb-3 {% if auth.deadline_type != 'CUSTOM' %}d-none{% endif %}" id="customDeadlineContainer">
+            <label class="form-label small">Custom Expiry Date &amp; Time</label>
+            <input type="datetime-local" class="form-control" name="custom_deadline" value="{{ auth.payment_deadline|date:'Y-m-d\TH:i' }}" {% if is_awaiting_payment %}readonly{% endif %}>
+          </div>
+
+          <div class="mb-4">
+            <label class="form-label fw-bold">Internal Notes</label>
+            <textarea class="form-control" name="ventures_notes" rows="2" placeholder="Any internal notes regarding this financial breakdown..." {% if is_awaiting_payment %}readonly{% endif %}>{{ auth.ventures_notes }}</textarea>
+          </div>
+
+          {% if not is_awaiting_payment %}
+          <button type="button" class="btn btn-success w-100 fw-bold py-2 shadow-sm" onclick="submitAuthForm()">
+            <i class="bi bi-send me-1"></i> Authorize &amp; Request Payment
+          </button>
+          {% else %}
+          <button type="button" class="btn btn-secondary w-100 py-2 disabled">
+            <i class="bi bi-check-circle me-1"></i> Payment Authorized
+          </button>
+          <div class="text-center mt-3">
+            <a href="{% url 'reservations:detail' reservation.booking_reference %}" class="text-decoration-none">Return to booking</a>
+          </div>
+          {% endif %}
+
+        </form>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+  function toggleNewCouponField() {
+    const sel = document.getElementById('couponActionSelect');
+    const container = document.getElementById('newCouponContainer');
+    if (sel.value === 'REPLACED') {
+      container.classList.remove('d-none');
+    } else {
+      container.classList.add('d-none');
+    }
+  }
+
+  function handleCouponActionChange() {
+    toggleNewCouponField();
+    const sel = document.getElementById('couponActionSelect');
+    const discountInput = document.querySelector('input[name="coupon_discount"]');
+    
+    if (sel.value === 'APPROVED') {
+      const option = sel.options[sel.selectedIndex];
+      const val = parseFloat(option.getAttribute('data-discount-val')) || 0;
+      const type = option.getAttribute('data-discount-type') || 'FIXED_AMOUNT';
+      
+      if (type === 'PERCENTAGE') {
+        const hallPrice = parseFloat(document.querySelector('input[name="hall_price"]').value) || 0;
+        const extraCharges = parseFloat(document.querySelector('input[name="extra_charges"]').value) || 0;
+        discountInput.value = (((hallPrice + extraCharges) * val) / 100).toFixed(2);
+      } else {
+        discountInput.value = val.toFixed(2);
+      }
+    } else {
+      discountInput.value = "0.00";
+    }
+    
+    calculateTotal();
+  }
+
+  function toggleCustomDeadline() {
+    const sel = document.getElementById('deadlineSelect');
+    const container = document.getElementById('customDeadlineContainer');
+    if (sel.value === 'CUSTOM') {
+      container.classList.remove('d-none');
+    } else {
+      container.classList.add('d-none');
+    }
+  }
+
+  function calculateTotal() {
+    const getVal = (name) => parseFloat(document.querySelector(`input[name="${name}"]`).value) || 0;
+    
+    const subtotal = getVal('hall_price') + getVal('security_deposit') + getVal('extra_charges') - getVal('coupon_discount') - getVal('discount_amount');
+    const vatRate = getVal('vat_rate');
+    const vatAmount = (subtotal * vatRate) / 100;
+    const total = Math.max(0, subtotal + vatAmount);
+
+    document.getElementById('displayTotalAmount').innerText = total.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2});
+    document.getElementById('inputTotalAmount').value = total.toFixed(2);
+  }
+
+  document.querySelectorAll('.calc-input').forEach(input => {
+    input.addEventListener('input', calculateTotal);
+  });
+
+  function submitAuthForm() {
+    if (confirm("Are you sure you want to authorize this payment and send the request to the applicant?")) {
+      document.getElementById('authForm').submit();
+    }
+  }
+
+  // Initial calculation
+  calculateTotal();
+</script>
+{% endblock %}

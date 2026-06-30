@@ -1,0 +1,115 @@
+{% extends "hall/base.html" %}
+{% block content %}
+  <div class="d-flex flex-wrap justify-content-between align-items-end gap-2 mb-3">
+    <div>
+      <h1 class="h4 mb-1">{% if mode == "master" %}Master Reservations{% else %}My Reservations{% endif %}</h1>
+      <div class="text-body-secondary">Track status, download receipts, and view your calendar.</div>
+    </div>
+    <a class="btn btn-outline-secondary btn-sm" href="{% url 'reservations:calendar' %}?mode={{ mode }}"><i class="bi bi-calendar3"></i> View calendar</a>
+  </div>
+
+  {% if can_view_master %}
+  <ul class="nav nav-tabs mb-3">
+    <li class="nav-item">
+      <a class="nav-link {% if mode == 'personal' %}active{% endif %}" href="?mode=personal">Personal Reservations</a>
+    </li>
+    <li class="nav-item">
+      <a class="nav-link {% if mode == 'master' %}active{% endif %}" href="?mode=master">Master Directory</a>
+    </li>
+  </ul>
+  {% endif %}
+
+  <div class="card app-card mb-3">
+    <div class="card-body">
+      <form method="get" class="row g-2 align-items-center">
+        <input type="hidden" name="mode" value="{{ mode }}">
+        <div class="col-md-4">
+          <input type="text" name="q" class="form-control" placeholder="Search reference, hall, event..." value="{{ q }}">
+        </div>
+        <div class="col-md-3">
+          <select name="status" class="form-select">
+            <option value="">All Statuses</option>
+            {% for status_val, status_name in ReservationStatus.choices %}
+              <option value="{{ status_val }}" {% if status == status_val %}selected{% endif %}>{{ status_name }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="col-md-3">
+          <select name="sort" class="form-select">
+            <option value="-booking_date" {% if sort == "-booking_date" %}selected{% endif %}>Date (Newest first)</option>
+            <option value="booking_date" {% if sort == "booking_date" %}selected{% endif %}>Date (Oldest first)</option>
+            <option value="-total_cost" {% if sort == "-total_cost" %}selected{% endif %}>Cost (High to Low)</option>
+            <option value="total_cost" {% if sort == "total_cost" %}selected{% endif %}>Cost (Low to High)</option>
+            <option value="-created_at" {% if sort == "-created_at" %}selected{% endif %}>Recently Created</option>
+          </select>
+        </div>
+        <div class="col-md-2 d-flex gap-2">
+          <button type="submit" class="btn btn-primary w-100"><i class="bi bi-search"></i> Filter</button>
+          <a href="?mode={{ mode }}" class="btn btn-outline-secondary"><i class="bi bi-x-circle"></i></a>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div class="card app-card">
+    <div class="table-responsive">
+      <table class="table table-hover align-middle mb-0">
+        <thead class="table-light">
+          <tr>
+            <th>Reference</th>
+            <th>Hall</th>
+            <th>Date</th>
+            <th>Time</th>
+            <th>Purpose</th>
+            <th>Status</th>
+            <th class="text-end">Total</th>
+            <th>Pay</th>
+            <th>Receipt</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for r in reservations %}
+            <tr>
+              <td class="fw-semibold"><a href="{% url 'reservations:detail' r.booking_reference %}" class="text-decoration-none">{{ r.booking_reference }}</a></td>
+              <td>{{ r.hall.name }}</td>
+              <td>{{ r.booking_date }}</td>
+              <td>{{ r.start_time }} – {{ r.end_time }}</td>
+              <td><span class="badge text-bg-secondary">{{ r.get_purpose_display }}</span></td>
+              <td>
+                {% if r.status == "SUBMITTED" or r.status == "FORWARDED" or r.status == "UNDER_REVIEW" %}
+                  <span class="badge text-bg-primary">{{ r.get_status_display }}</span>
+                {% elif r.status == "AVAILABLE" or r.status == "APPROVED_PAYMENT" or r.status == "PAYMENT_PENDING" %}
+                  <span class="badge text-bg-warning">{{ r.get_status_display }}</span>
+                {% elif r.status == "PAID" or r.status == "CONFIRMED" %}
+                  <span class="badge text-bg-danger">{{ r.get_status_display }}</span>
+                {% elif r.status == "COMPLETED" or r.status == "INSPECTION_PENDING" %}
+                  <span class="badge text-bg-info">{{ r.get_status_display }}</span>
+                {% elif r.status == "DAMAGE_REPORTED" %}
+                  <span class="badge text-bg-danger">{{ r.get_status_display }}</span>
+                {% elif r.status == "REJECTED" or r.status == "CANCELLED" %}
+                  <span class="badge text-bg-secondary">{{ r.get_status_display }}</span>
+                {% elif r.status == "CLOSED" %}
+                  <span class="badge text-bg-dark">{{ r.get_status_display }}</span>
+                {% else %}
+                  <span class="badge text-bg-light text-dark">{{ r.get_status_display }}</span>
+                {% endif %}
+              </td>
+              <td class="text-end">₦{{ r.total_cost }}</td>
+              <td>
+                {% if r.status == "APPROVED_PAYMENT" or r.status == "PAYMENT_PENDING" or r.status == "PENDING" %}
+                  <a class="btn btn-success btn-sm" href="{% url 'payments:start_reservation_payment' r.booking_reference %}"><i class="bi bi-credit-card"></i> Pay</a>
+                {% else %}
+                  <span class="text-body-secondary small">—</span>
+                {% endif %}
+              </td>
+              <td><a class="btn btn-outline-primary btn-sm" href="{% url 'reservations:receipt_pdf' r.booking_reference %}"><i class="bi bi-filetype-pdf"></i> PDF</a></td>
+            </tr>
+          {% empty %}
+            <tr><td colspan="9" class="text-body-secondary p-4">No reservations found.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+{% endblock %}
+

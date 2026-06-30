@@ -1,0 +1,118 @@
+{% extends "hall/base.html" %}
+{% block content %}
+<div class="d-flex align-items-center justify-content-between mb-4">
+  <div>
+    <h1 class="h4 mb-1"><i class="bi bi-ticket-perforated me-2"></i>Coupon Management</h1>
+    <p class="text-body-secondary small mb-0">Create and manage discount coupons for hall bookings.</p>
+  </div>
+  <a href="{% url 'payments:coupon_create' %}" class="btn btn-success">
+    <i class="bi bi-plus-lg me-1"></i> New Coupon
+  </a>
+</div>
+
+<div class="card app-card">
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table class="table table-hover align-middle mb-0">
+        <thead>
+          <tr class="text-body-secondary small">
+            <th class="px-4 py-3">Code</th>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Value</th>
+            <th>Valid Until</th>
+            <th>Usage</th>
+            <th>Dept</th>
+            <th>Status</th>
+            <th class="text-end px-4">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for coupon in coupons %}
+          <tr>
+            <td class="px-4 py-3">
+              <code class="fw-semibold text-warning">{{ coupon.code }}</code>
+            </td>
+            <td>
+              <div class="fw-semibold">{{ coupon.name }}</div>
+              {% if coupon.description %}
+                <div class="small text-body-secondary">{{ coupon.description|truncatechars:60 }}</div>
+              {% endif %}
+            </td>
+            <td>
+              {% if coupon.discount_type == "PERCENTAGE" %}
+                <span class="badge text-bg-info">%</span>
+              {% else %}
+                <span class="badge text-bg-primary">₦</span>
+              {% endif %}
+            </td>
+            <td>
+              {% if coupon.discount_type == "PERCENTAGE" %}
+                {{ coupon.value }}%
+                {% if coupon.max_discount %}
+                  <div class="small text-body-secondary">max ₦{{ coupon.max_discount }}</div>
+                {% endif %}
+              {% else %}
+                ₦{{ coupon.value }}
+              {% endif %}
+            </td>
+            <td>
+              {% if coupon.valid_until %}
+                <span class="small">{{ coupon.valid_until|date:"d M Y" }}</span>
+              {% else %}
+                <span class="text-body-secondary">No expiry</span>
+              {% endif %}
+            </td>
+            <td>
+              {% if coupon.total_usage_limit %}
+                <span class="small">Limit: {{ coupon.total_usage_limit }}</span>
+              {% else %}
+                <span class="text-body-secondary">Unlimited</span>
+              {% endif %}
+            </td>
+            <td>
+              {% if coupon.owner_department %}
+                <span class="badge text-bg-secondary">{{ coupon.owner_department }}</span>
+              {% else %}<span class="text-body-secondary">—</span>{% endif %}
+            </td>
+            <td>
+              {% if coupon.is_active %}
+                <span class="badge text-bg-success">Active</span>
+              {% else %}
+                <span class="badge text-bg-danger">Inactive</span>
+              {% endif %}
+            </td>
+            <td class="text-end px-4">
+              <div class="d-flex gap-1 justify-content-end">
+                <a href="{% url 'payments:coupon_edit' pk=coupon.pk %}" class="btn btn-sm btn-outline-primary" title="Edit">
+                  <i class="bi bi-pencil"></i>
+                </a>
+                <form method="post" action="{% url 'payments:coupon_toggle' pk=coupon.pk %}" class="d-inline">
+                  {% csrf_token %}
+                  <button type="submit" class="btn btn-sm btn-outline-secondary" title="Toggle status">
+                    {% if coupon.is_active %}<i class="bi bi-pause-circle"></i>{% else %}<i class="bi bi-play-circle"></i>{% endif %}
+                  </button>
+                </form>
+                <form method="post" action="{% url 'payments:coupon_delete' pk=coupon.pk %}" class="d-inline"
+                      onsubmit="return confirm('Delete coupon {{ coupon.code }}? This cannot be undone.')">
+                  {% csrf_token %}
+                  <button type="submit" class="btn btn-sm btn-outline-danger" title="Delete">
+                    <i class="bi bi-trash"></i>
+                  </button>
+                </form>
+              </div>
+            </td>
+          </tr>
+          {% empty %}
+          <tr>
+            <td colspan="9" class="text-center py-5 text-body-secondary">
+              No coupons found. <a href="{% url 'payments:coupon_create' %}">Create the first coupon.</a>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}

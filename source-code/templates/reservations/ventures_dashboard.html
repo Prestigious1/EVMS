@@ -1,0 +1,477 @@
+{% extends "hall/base.html" %}
+{% block title %}Ventures Revenue & Reservation Centre{% endblock %}
+{% block nav_ventures %}active{% endblock %}
+
+{% block content %}
+{# ══════════════════════════════════════════════════════════════════ #}
+{#  LASU VENTURES — REVENUE & RESERVATION CONTROL CENTRE             #}
+{# ══════════════════════════════════════════════════════════════════ #}
+
+{# ── Page Header ──────────────────────────────────────────────────── #}
+<div class="page-header">
+  <div>
+    <h1><i class="bi bi-diagram-3 text-warning me-2"></i>Ventures Control Centre</h1>
+    <p class="page-subtitle">Revenue management, booking approvals &amp; reservation oversight</p>
+  </div>
+  <div class="d-flex flex-wrap gap-2">
+    <a class="btn btn-sm border border-warning text-body hover-lift" href="{% url 'reservations:penalty_list' %}">
+      <i class="bi bi-exclamation-octagon text-warning me-1"></i>Penalties
+    </a>
+    <a class="btn btn-sm border border-info text-body hover-lift" href="{% url 'payments:coupon_list' %}">
+      <i class="bi bi-ticket-perforated text-info me-1"></i>Coupons
+    </a>
+    <a class="btn btn-sm border border-primary text-body hover-lift" href="{% url 'reports:dashboard' %}">
+      <i class="bi bi-graph-up-arrow text-primary me-1"></i>Analytics
+    </a>
+  </div>
+</div>
+
+{# ── Workflow Banner ──────────────────────────────────────────────── #}
+<div class="workflow-banner mb-4">
+  <i class="bi bi-diagram-3 text-warning me-1"></i>
+  <strong class="me-1">Workflow:</strong>
+  <span class="wf-step wf-active">Submitted</span><span class="wf-arrow">→</span>
+  <span class="wf-step">Under Review</span><span class="wf-arrow">→</span>
+  <span class="wf-step">Forwarded</span><span class="wf-arrow">→</span>
+  <span class="wf-step">Available</span><span class="wf-arrow">→</span>
+  <span class="wf-step">Approved for Payment</span><span class="wf-arrow">→</span>
+  <span class="wf-step">Paid</span><span class="wf-arrow">→</span>
+  <span class="wf-step">Confirmed</span><span class="wf-arrow">→</span>
+  <span class="wf-step">Completed</span>
+</div>
+
+{# ══════════════════════════════════════════════════════════════════ #}
+{# KPI CARDS ROW                                                       #}
+{# ══════════════════════════════════════════════════════════════════ #}
+<div class="row g-3 mb-4">
+
+  {# 1. Pending Reviews #}
+  <div class="col-6 col-md-4 col-lg-3 col-xl">
+    <a href="#queue-section" class="kpi-card h-100 text-decoration-none">
+      <div class="kpi-icon" style="background:rgba(59,130,246,.15);color:#60a5fa;">
+        <i class="bi bi-inbox-fill"></i>
+      </div>
+      <div class="kpi-value">{{ kpi_pending_reviews }}</div>
+      <div class="kpi-label">Pending<br>Reviews</div>
+      {% if kpi_pending_reviews > 0 %}
+        <span class="kpi-trend kpi-trend-down">Needs attention</span>
+      {% endif %}
+    </a>
+  </div>
+
+  {# 2. Awaiting Facility Response #}
+  <div class="col-6 col-md-4 col-lg-3 col-xl">
+    <a href="#queue-section" class="kpi-card h-100 text-decoration-none">
+      <div class="kpi-icon" style="background:rgba(99,102,241,.15);color:#818cf8;">
+        <i class="bi bi-arrow-right-circle"></i>
+      </div>
+      <div class="kpi-value">{{ kpi_awaiting_facility }}</div>
+      <div class="kpi-label">Awaiting Facility<br>Response</div>
+    </a>
+  </div>
+
+  {# 3. Awaiting Applicant Payment #}
+  <div class="col-6 col-md-4 col-lg-3 col-xl">
+    <a href="#queue-section" class="kpi-card h-100 text-decoration-none">
+      <div class="kpi-icon" style="background:rgba(245,158,11,.15);color:#fbbf24;">
+        <i class="bi bi-credit-card"></i>
+      </div>
+      <div class="kpi-value">{{ kpi_awaiting_payment }}</div>
+      <div class="kpi-label">Awaiting<br>Applicant Payment</div>
+      {% if kpi_awaiting_payment > 0 %}
+        <span class="kpi-trend kpi-trend-neutral">{{ kpi_awaiting_payment }} pending</span>
+      {% endif %}
+    </a>
+  </div>
+
+  {# 4. Awaiting Bursary / Confirmation (Paid) #}
+  <div class="col-6 col-md-4 col-lg-3 col-xl">
+    <a href="#queue-section" class="kpi-card h-100 text-decoration-none">
+      <div class="kpi-icon" style="background:rgba(168,85,247,.15);color:#c084fc;">
+        <i class="bi bi-shield-check"></i>
+      </div>
+      <div class="kpi-value">{{ kpi_paid_pending_confirm }}</div>
+      <div class="kpi-label">Paid — Awaiting<br>Confirmation</div>
+    </a>
+  </div>
+
+  {# 5. Confirmed Bookings #}
+  <div class="col-6 col-md-4 col-lg-3 col-xl">
+    <a href="#queue-section" class="kpi-card h-100 text-decoration-none">
+      <div class="kpi-icon" style="background:rgba(16,185,129,.15);color:#34d399;">
+        <i class="bi bi-calendar-check"></i>
+      </div>
+      <div class="kpi-value">{{ kpi_confirmed }}</div>
+      <div class="kpi-label">Awaiting Final<br>Approval</div>
+    </a>
+  </div>
+
+  {# 6. Approved / Completed Bookings #}
+  <div class="col-6 col-md-4 col-lg-3 col-xl">
+    <a href="{% url 'reservations:my_reservations' %}?mode=master&status=COMPLETED" class="kpi-card h-100 text-decoration-none">
+      <div class="kpi-icon" style="background:rgba(34,197,94,.15);color:#4ade80;">
+        <i class="bi bi-check2-circle"></i>
+      </div>
+      <div class="kpi-value">{{ kpi_approved }}</div>
+      <div class="kpi-label">Approved<br>Bookings</div>
+    </a>
+  </div>
+
+  {# 7. Revenue This Month #}
+  <div class="col-6 col-md-4 col-lg-3 col-xl">
+    <a href="{% url 'reports:dashboard' %}" class="kpi-card h-100 text-decoration-none">
+      <div class="kpi-icon" style="background:rgba(234,179,8,.15);color:#facc15;">
+        <i class="bi bi-cash-stack"></i>
+      </div>
+      <div class="kpi-value" style="font-size:1.2rem;">₦{{ revenue_this_month|floatformat:0 }}</div>
+      <div class="kpi-label">Revenue<br>This Month</div>
+    </a>
+  </div>
+
+  {# 8. Coupons Applied #}
+  <div class="col-6 col-md-4 col-lg-3 col-xl">
+    <a href="{% url 'payments:coupon_list' %}" class="kpi-card h-100 text-decoration-none">
+      <div class="kpi-icon" style="background:rgba(148,163,184,.12);color:#94a3b8;">
+        <i class="bi bi-ticket-perforated"></i>
+      </div>
+      <div class="kpi-value">{{ coupons_applied }}</div>
+      <div class="kpi-label">Coupons Applied<br>This Month</div>
+    </a>
+  </div>
+
+</div>{# /KPI row #}
+
+{# ══════════════════════════════════════════════════════════════════ #}
+{# QUICK ACTIONS GRID                                                   #}
+{# ══════════════════════════════════════════════════════════════════ #}
+<div class="app-card mb-4 p-3">
+  <div class="section-hdr mb-3">
+    <div class="section-hdr-title"><i class="bi bi-lightning-charge"></i>Quick Actions</div>
+  </div>
+  <div class="row g-2 row-cols-3 row-cols-md-6">
+    <div class="col">
+      <a href="{% url 'reservations:my_reservations' %}?mode=master&status=SUBMITTED" class="qa-tile">
+        <div class="qa-tile-icon" style="background:rgba(59,130,246,.15);color:#60a5fa;"><i class="bi bi-clipboard2-check"></i></div>
+        Review Booking
+      </a>
+    </div>
+    <div class="col">
+      <a href="{% url 'reservations:my_reservations' %}?mode=master&status=AVAILABLE" class="qa-tile">
+        <div class="qa-tile-icon" style="background:rgba(34,197,94,.15);color:#4ade80;"><i class="bi bi-check2-circle"></i></div>
+        Approve Booking
+      </a>
+    </div>
+    <div class="col">
+      <a href="{% url 'reservations:my_reservations' %}?mode=master&status=AVAILABLE" class="qa-tile">
+        <div class="qa-tile-icon" style="background:rgba(234,179,8,.15);color:#facc15;"><i class="bi bi-cash-stack"></i></div>
+        Request Payment
+      </a>
+    </div>
+    <div class="col">
+      <a href="{% url 'payments:coupon_list' %}" class="qa-tile">
+        <div class="qa-tile-icon" style="background:rgba(16,185,129,.15);color:#34d399;"><i class="bi bi-ticket-perforated"></i></div>
+        View Coupons
+      </a>
+    </div>
+    <div class="col">
+      <a href="{% url 'reports:dashboard' %}" class="qa-tile">
+        <div class="qa-tile-icon" style="background:rgba(99,102,241,.15);color:#818cf8;"><i class="bi bi-graph-up-arrow"></i></div>
+        Financial Reports
+      </a>
+    </div>
+    <div class="col">
+      <a href="{% url 'reservations:my_reservations' %}?mode=master" class="qa-tile">
+        <div class="qa-tile-icon" style="background:rgba(148,163,184,.12);color:#94a3b8;"><i class="bi bi-list-check"></i></div>
+        Reservation Queue
+      </a>
+    </div>
+  </div>
+</div>
+
+{# ══════════════════════════════════════════════════════════════════ #}
+{# ACTIVITY PANELS — 3 column                                          #}
+{# ══════════════════════════════════════════════════════════════════ #}
+<div class="row g-3 mb-4">
+
+  {# Panel 1: Latest Applications #}
+  <div class="col-12 col-md-6 col-lg-4">
+    <div class="app-card h-100 p-3">
+      <div class="section-hdr">
+        <div class="section-hdr-title"><i class="bi bi-inbox text-primary"></i>Latest Applications</div>
+        <a href="{% url 'reservations:my_reservations' %}?mode=master&status=SUBMITTED" class="section-hdr-action">View all →</a>
+      </div>
+      {% if recent_applications %}
+        <ul class="activity-feed">
+          {% for r in recent_applications %}
+          <li class="activity-item">
+            <span class="activity-dot" style="background:#60a5fa;"></span>
+            <div class="flex-grow-1 min-w-0">
+              <div class="activity-title">
+                <a href="{% url 'reservations:detail' r.booking_reference %}" class="text-decoration-none text-body">
+                  {{ r.event_name|truncatechars:35|default:r.booking_reference }}
+                </a>
+              </div>
+              <div class="activity-meta">{{ r.hall.name|truncatechars:20 }} · {{ r.booking_date }}</div>
+            </div>
+            <form method="post" action="{% url 'reservations:ventures_action' r.booking_reference %}" class="d-inline flex-shrink-0">
+              {% csrf_token %}<input type="hidden" name="action" value="review">
+              <button type="submit" class="btn btn-xs btn-outline-warning" title="Start Review">
+                <i class="bi bi-hourglass-split"></i>
+              </button>
+            </form>
+          </li>
+          {% endfor %}
+        </ul>
+      {% else %}
+        <div class="empty-state py-3">
+          <div class="empty-icon"><i class="bi bi-inbox"></i></div>
+          <h5>No new applications</h5>
+          <p>Submitted bookings will appear here for your review.</p>
+        </div>
+      {% endif %}
+    </div>
+  </div>
+
+  {# Panel 2: Recently Approved / Payments Waiting #}
+  <div class="col-12 col-md-6 col-lg-4">
+    <div class="app-card h-100 p-3">
+      <div class="section-hdr">
+        <div class="section-hdr-title"><i class="bi bi-credit-card text-warning"></i>Payments Waiting</div>
+        <a href="{% url 'reservations:my_reservations' %}?mode=master&status=APPROVED_PAYMENT" class="section-hdr-action">View all →</a>
+      </div>
+      {% if payments_waiting %}
+        <ul class="activity-feed">
+          {% for r in payments_waiting %}
+          <li class="activity-item">
+            <span class="activity-dot" style="background:#fbbf24;"></span>
+            <div class="flex-grow-1 min-w-0">
+              <div class="activity-title">
+                <a href="{% url 'reservations:detail' r.booking_reference %}" class="text-decoration-none text-body">
+                  {{ r.event_name|truncatechars:32|default:r.booking_reference }}
+                </a>
+              </div>
+              <div class="activity-meta">
+                {{ r.hall.name|truncatechars:18 }} · ₦{{ r.total_cost|floatformat:0 }}
+              </div>
+            </div>
+            <span class="status-pill badge-status-approved_payment flex-shrink-0">Awaiting</span>
+          </li>
+          {% endfor %}
+        </ul>
+      {% else %}
+        <div class="empty-state py-3">
+          <div class="empty-icon"><i class="bi bi-credit-card"></i></div>
+          <h5>No payments pending</h5>
+          <p>Bookings approved for payment will appear here.</p>
+        </div>
+      {% endif %}
+
+      {% if recently_approved %}
+      <div class="section-hdr mt-3">
+        <div class="section-hdr-title text-success"><i class="bi bi-check2-circle"></i>Recently Approved</div>
+      </div>
+      <ul class="activity-feed">
+        {% for r in recently_approved %}
+        <li class="activity-item">
+          <span class="activity-dot" style="background:#4ade80;"></span>
+          <div class="flex-grow-1 min-w-0">
+            <div class="activity-title">
+              <a href="{% url 'reservations:detail' r.booking_reference %}" class="text-decoration-none text-body">
+                {{ r.event_name|truncatechars:32|default:r.booking_reference }}
+              </a>
+            </div>
+            <div class="activity-meta">{{ r.hall.name|truncatechars:18 }} · {{ r.booking_date }}</div>
+          </div>
+        </li>
+        {% endfor %}
+      </ul>
+      {% endif %}
+    </div>
+  </div>
+
+  {# Panel 3: Recently Rejected + Notifications #}
+  <div class="col-12 col-md-6 col-lg-4">
+    <div class="app-card h-100 p-3">
+      <div class="section-hdr">
+        <div class="section-hdr-title"><i class="bi bi-x-circle text-danger"></i>Recently Rejected</div>
+        <a href="{% url 'reservations:my_reservations' %}?mode=master&status=REJECTED" class="section-hdr-action">View all →</a>
+      </div>
+      {% if recently_rejected %}
+        <ul class="activity-feed">
+          {% for r in recently_rejected %}
+          <li class="activity-item">
+            <span class="activity-dot" style="background:#f87171;"></span>
+            <div class="flex-grow-1 min-w-0">
+              <div class="activity-title">
+                <a href="{% url 'reservations:detail' r.booking_reference %}" class="text-decoration-none text-body">
+                  {{ r.event_name|truncatechars:32|default:r.booking_reference }}
+                </a>
+              </div>
+              <div class="activity-meta">{{ r.hall.name|truncatechars:18 }} · {{ r.booking_date }}</div>
+            </div>
+            <span class="status-pill badge-status-rejected flex-shrink-0">{{ r.status }}</span>
+          </li>
+          {% endfor %}
+        </ul>
+      {% else %}
+        <div class="empty-state py-3">
+          <div class="empty-icon"><i class="bi bi-check2-all"></i></div>
+          <h5>No recent rejections</h5>
+          <p>Rejected or cancelled bookings will appear here.</p>
+        </div>
+      {% endif %}
+
+      {% if latest_notifications %}
+      <div class="section-hdr mt-3">
+        <div class="section-hdr-title"><i class="bi bi-bell"></i>Latest Alerts</div>
+        <a href="{% url 'notifications:inbox' %}" class="section-hdr-action">All →</a>
+      </div>
+      <ul class="activity-feed">
+        {% for notif in latest_notifications %}
+        <li class="activity-item">
+          <span class="activity-dot" style="background:#60a5fa;"></span>
+          <div class="flex-grow-1 min-w-0">
+            <div class="activity-title">{{ notif.message|truncatechars:50 }}</div>
+            <div class="activity-meta">{{ notif.created_at|timesince }} ago</div>
+          </div>
+        </li>
+        {% endfor %}
+      </ul>
+      {% endif %}
+    </div>
+  </div>
+
+</div>{# /activity panels #}
+
+{# ══════════════════════════════════════════════════════════════════ #}
+{# RESERVATION QUEUE — Tabbed (legacy tables preserved)                #}
+{# ══════════════════════════════════════════════════════════════════ #}
+<div id="queue-section" class="app-card">
+  <div class="card-header d-flex justify-content-between align-items-center py-3">
+    <div class="fw-semibold"><i class="bi bi-list-check me-2"></i>Full Reservation Queue</div>
+    <a href="{% url 'reservations:my_reservations' %}?mode=master" class="btn btn-xs btn-outline-secondary">View all reservations</a>
+  </div>
+
+  {% if sections %}
+    <div class="px-3 pt-3">
+      <div class="evms-tabs" id="venturesQueueTabs">
+        {% for title, qs, icon, color in sections %}
+          {% if qs %}
+          <a class="evms-tab {% if forloop.first %}active{% endif %}"
+             data-tab="ventures-sec-{{ forloop.counter }}"
+             href="#ventures-sec-{{ forloop.counter }}"
+             onclick="showTab(event,'venturesQueueTabs','venturesQueueBody')">
+            <i class="bi {{ icon }} me-1"></i>{{ title }}
+            <span class="badge text-bg-{{ color }} ms-1" style="font-size:0.65rem;">{{ qs|length }}</span>
+          </a>
+          {% endif %}
+        {% endfor %}
+      </div>
+    </div>
+
+    <div id="venturesQueueBody">
+      {% for title, qs, icon, color in sections %}
+        {% if qs %}
+        <div class="evms-tab-content {% if forloop.first %}active{% endif %}" id="ventures-sec-{{ forloop.counter }}">
+          <div class="table-responsive">
+            <table class="table table-sm table-hover mb-0">
+              <thead>
+                <tr>
+                  <th>Reference</th>
+                  <th>Event</th>
+                  <th>Hall</th>
+                  <th>Date</th>
+                  <th>Cost</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for r in qs|slice:":15" %}
+                <tr>
+                  <td><a href="{% url 'reservations:detail' r.booking_reference %}" class="font-monospace small text-info">{{ r.booking_reference|slice:"-12:" }}</a></td>
+                  <td class="small">{{ r.event_name|truncatechars:30 }}</td>
+                  <td class="small">{{ r.hall.name|truncatechars:22 }}</td>
+                  <td class="small text-nowrap">{{ r.booking_date }}</td>
+                  <td class="small text-nowrap">₦{{ r.total_cost|floatformat:0 }}</td>
+                  <td>
+                    <div class="d-flex gap-1 flex-wrap">
+                      <a href="{% url 'reservations:detail' r.booking_reference %}" class="btn btn-xs btn-outline-secondary" title="View details"><i class="bi bi-eye"></i></a>
+                      {% if r.status == "SUBMITTED" or r.status == "UNDER_REVIEW" %}
+                      <form method="post" action="{% url 'reservations:ventures_action' r.booking_reference %}" class="d-inline">
+                        {% csrf_token %}<input type="hidden" name="action" value="review">
+                        <button type="submit" class="btn btn-xs btn-outline-warning" title="Mark Under Review"><i class="bi bi-hourglass-split"></i></button>
+                      </form>
+                      <form method="post" action="{% url 'reservations:ventures_action' r.booking_reference %}" class="d-inline">
+                        {% csrf_token %}<input type="hidden" name="action" value="forward">
+                        <button type="submit" class="btn btn-xs btn-outline-primary" title="Forward to Facility"><i class="bi bi-arrow-right"></i></button>
+                      </form>
+                      {% endif %}
+                      {% if r.status == "AVAILABLE" %}
+                      <a href="{% url 'reservations:detail' r.booking_reference %}#ventures" class="btn btn-xs btn-success" title="Set cost &amp; approve payment">
+                        <i class="bi bi-cash-stack"></i> Approve
+                      </a>
+                      {% endif %}
+                      {% if r.status == "PAID" %}
+                      <form method="post" action="{% url 'reservations:ventures_action' r.booking_reference %}" class="d-inline">
+                        {% csrf_token %}<input type="hidden" name="action" value="confirm">
+                        <button type="submit" class="btn btn-xs btn-success" title="Confirm Booking"><i class="bi bi-calendar-check"></i> Confirm</button>
+                      </form>
+                      {% endif %}
+                      {% if r.status == "CONFIRMED" %}
+                      <form method="post" action="{% url 'reservations:ventures_action' r.booking_reference %}" class="d-inline">
+                        {% csrf_token %}<input type="hidden" name="action" value="complete">
+                        <button type="submit" class="btn btn-xs btn-outline-secondary" title="Mark Completed"><i class="bi bi-flag"></i></button>
+                      </form>
+                      {% endif %}
+                      {% if r.status == "COMPLETED" %}
+                      <form method="post" action="{% url 'reservations:ventures_action' r.booking_reference %}" class="d-inline">
+                        {% csrf_token %}<input type="hidden" name="action" value="open_inspection">
+                        <button type="submit" class="btn btn-xs btn-outline-info" title="Open Inspection"><i class="bi bi-clipboard-check"></i></button>
+                      </form>
+                      {% endif %}
+                      <form method="post" action="{% url 'reservations:ventures_action' r.booking_reference %}" class="d-inline" onsubmit="return confirm('Cancel {{ r.booking_reference }}?')">
+                        {% csrf_token %}<input type="hidden" name="action" value="cancel">
+                        <button type="submit" class="btn btn-xs btn-outline-danger" title="Cancel"><i class="bi bi-x"></i></button>
+                      </form>
+                    </div>
+                  </td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+          {% if qs|length > 15 %}
+          <div class="text-center py-2 small text-body-secondary border-top">
+            <i class="bi bi-plus-circle me-1"></i>{{ qs|length|add:"-15" }} more —
+            <a href="{% url 'reservations:my_reservations' %}?mode=master">View all reservations</a>
+          </div>
+          {% endif %}
+        </div>
+        {% endif %}
+      {% endfor %}
+    </div>
+
+  {% else %}
+    <div class="empty-state p-5">
+      <div class="empty-icon text-success"><i class="bi bi-check2-circle"></i></div>
+      <h5>Reservation queue is clear</h5>
+      <p>New booking applications will appear here when submitted by applicants.</p>
+      <a href="{% url 'hall:hall_list' %}" class="btn btn-sm btn-outline-warning">
+        <i class="bi bi-building me-1"></i>Browse Halls
+      </a>
+    </div>
+  {% endif %}
+</div>{# /queue-section #}
+
+<script>
+function showTab(e, tabsId, bodyId) {
+  e.preventDefault();
+  const target = e.currentTarget.dataset.tab;
+  document.querySelectorAll('#' + tabsId + ' .evms-tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('#' + bodyId + ' .evms-tab-content').forEach(c => c.classList.remove('active'));
+  e.currentTarget.classList.add('active');
+  const pane = document.getElementById(target);
+  if (pane) pane.classList.add('active');
+}
+</script>
+{% endblock %}

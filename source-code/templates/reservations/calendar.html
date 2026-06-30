@@ -1,0 +1,104 @@
+{% extends "hall/base.html" %}
+{% block content %}
+  <div class="d-flex flex-wrap justify-content-between align-items-end gap-2 mb-3">
+    <div>
+      <h1 class="h4 mb-1">
+        {% if mode == 'public' %}Public Booking Calendar
+        {% elif mode == 'user' %}My Reservation Calendar
+        {% elif mode == 'ventures' %}Ventures Master Calendar
+        {% elif mode == 'facility' %}Facility Operations Calendar
+        {% elif mode == 'admin' %}Admin Master Calendar
+        {% else %}Reservation Calendar{% endif %}
+      </h1>
+      <div class="text-body-secondary">
+        {% if mode == 'public' %}View hall availability and blocks.{% else %}Track reservations and manage schedules.{% endif %}
+      </div>
+    </div>
+    <div class="d-flex flex-wrap gap-2 align-items-center">
+      <form method="get" class="d-flex align-items-center gap-2">
+        <input type="hidden" name="mode" value="{{ mode }}">
+        <select name="hall_id" class="form-select form-select-sm" onchange="this.form.submit()">
+          <option value="">All Halls</option>
+          {% for h in halls %}
+            <option value="{{ h.id }}" {% if h.id|stringformat:"s" == selected_hall_id %}selected{% endif %}>{{ h.name }}</option>
+          {% endfor %}
+        </select>
+      </form>
+      {% if mode == 'user' %}
+        <a class="btn btn-outline-secondary btn-sm" href="{% url 'reservations:my_reservations' %}"><i class="bi bi-list-check"></i> My reservations</a>
+      {% elif mode == 'ventures' %}
+        <a class="btn btn-outline-secondary btn-sm" href="{% url 'reservations:ventures_dashboard' %}"><i class="bi bi-list-check"></i> Ventures desk</a>
+      {% elif mode == 'facility' %}
+        <a class="btn btn-outline-secondary btn-sm" href="{% url 'reservations:facility_dashboard' %}"><i class="bi bi-list-check"></i> Facility desk</a>
+      {% endif %}
+    </div>
+  </div>
+
+  {% if can_view_master %}
+  <ul class="nav nav-tabs mb-3">
+    <li class="nav-item">
+      <a class="nav-link {% if mode == 'user' %}active{% endif %}" href="?mode=user">Personal Calendar</a>
+    </li>
+    <li class="nav-item">
+      <a class="nav-link {% if mode != 'user' and mode != 'public' %}active{% endif %}" href="?mode={% if 'admin' in request.path %}admin{% else %}facility{% endif %}">Master Calendar</a>
+    </li>
+  </ul>
+  {% endif %}
+
+  <div class="card app-card mb-3">
+    <div class="card-body py-2">
+      <div class="d-flex flex-wrap gap-3 small">
+        {% if mode == 'public' %}
+          <div class="d-flex align-items-center gap-2"><span class="badge" style="background-color: #ef4444;">Booked</span> Fully booked</div>
+          <div class="d-flex align-items-center gap-2"><span class="badge" style="background-color: #f59e0b;">Pending</span> Awaiting confirmation</div>
+          <div class="d-flex align-items-center gap-2"><span class="badge" style="background-color: rgba(220, 53, 69, 0.4);">Blocked</span> Hall unavailable</div>
+        {% else %}
+          <div class="d-flex align-items-center gap-2"><span class="badge text-bg-success">Available</span> Facility confirmed</div>
+          <div class="d-flex align-items-center gap-2"><span class="badge text-bg-warning">Approved / Payment Pending</span> Awaiting payment</div>
+          <div class="d-flex align-items-center gap-2"><span class="badge text-bg-danger">Paid / Confirmed</span> Fully booked</div>
+          <div class="d-flex align-items-center gap-2"><span class="badge text-bg-primary">Submitted / Forwarded / Review</span> In workflow</div>
+          <div class="d-flex align-items-center gap-2"><span class="badge text-bg-secondary">Completed / Closed / Rejected</span> Terminal</div>
+          <div class="d-flex align-items-center gap-2"><span class="badge" style="background-color: rgba(220, 53, 69, 0.4);">Blocked</span> Hall blocked</div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <link href="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.15/index.global.min.css" rel="stylesheet">
+  <div class="card app-card">
+    <div class="card-body">
+      <div id="calendar"></div>
+      <div class="text-body-secondary small mt-3">
+        {% if mode == 'public' %}
+          Colors indicate availability.
+        {% else %}
+          Tip: click an event to view details. Colors indicate booking status.
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.15/index.global.min.js"></script>
+  <script>
+    document.addEventListener("DOMContentLoaded", function () {
+      const calendar = new FullCalendar.Calendar(document.getElementById("calendar"), {
+        initialView: "dayGridMonth",
+        headerToolbar: {
+          left: "prev,next today",
+          center: "title",
+          right: "dayGridMonth,timeGridWeek,timeGridDay,listWeek"
+        },
+        events: "{% url 'reservations:calendar_events' %}?mode={{ mode }}&hall_id={{ selected_hall_id }}",
+        nowIndicator: true,
+        height: "auto",
+        eventDidMount: function(info) {
+          const props = info.event.extendedProps;
+          if (props.status) {
+            info.el.setAttribute("title", info.event.title + " — " + props.status.replace(/_/g, " "));
+          }
+        },
+      });
+      calendar.render();
+    });
+  </script>
+{% endblock %}

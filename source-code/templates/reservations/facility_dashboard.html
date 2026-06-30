@@ -1,0 +1,481 @@
+{% extends "hall/base.html" %}
+{% block title %}Facility Operations Centre{% endblock %}
+{% block nav_facility %}active{% endblock %}
+
+{% block content %}
+{# ══════════════════════════════════════════════════════════════════ #}
+{#  FACILITY OPERATIONS CONTROL CENTRE                               #}
+{# ══════════════════════════════════════════════════════════════════ #}
+
+{# ── Page Header ──────────────────────────────────────────────────── #}
+<div class="page-header">
+  <div>
+    <h1><i class="bi bi-building-gear text-info me-2"></i>Operations Control Centre</h1>
+    <p class="page-subtitle">Physical hall readiness, inspections, maintenance &amp; availability management</p>
+  </div>
+  <div class="d-flex flex-wrap gap-2">
+    <a class="btn btn-sm border text-body hover-lift" href="{% url 'reservations:calendar' %}?mode=facility">
+      <i class="bi bi-calendar3 text-info me-1"></i>Operations Calendar
+    </a>
+    <a class="btn btn-sm border border-success text-body hover-lift" href="{% url 'hall:hall_manage' %}">
+      <i class="bi bi-building-check text-success me-1"></i>Manage Halls
+    </a>
+    <a class="btn btn-sm border border-primary text-body hover-lift" href="{% url 'reports:dashboard' %}">
+      <i class="bi bi-graph-up-arrow text-primary me-1"></i>Analytics
+    </a>
+  </div>
+</div>
+
+{# ── Workflow Banner ──────────────────────────────────────────────── #}
+<div class="workflow-banner mb-4">
+  <i class="bi bi-diagram-3 text-info me-1"></i>
+  <strong class="me-1">Facility Workflow:</strong>
+  <span class="wf-step">Submitted</span><span class="wf-arrow">→</span>
+  <span class="wf-step wf-active">Forwarded</span><span class="wf-arrow">→</span>
+  <span class="wf-step">Available</span><span class="wf-arrow">→</span>
+  <span class="wf-step">Confirmed</span><span class="wf-arrow">→</span>
+  <span class="wf-step">Completed</span><span class="wf-arrow">→</span>
+  <span class="wf-step">Inspection</span><span class="wf-arrow">→</span>
+  <span class="wf-step">Closed</span>
+  <span class="wf-arrow ms-1">/</span>
+  <span class="wf-step text-danger">Damage Reported</span>
+</div>
+
+{# ══════════════════════════════════════════════════════════════════ #}
+{# KPI CARDS ROW                                                      #}
+{# ══════════════════════════════════════════════════════════════════ #}
+<div class="row g-3 mb-4">
+
+  {# 1. Available Halls #}
+  <div class="col-6 col-md-4 col-lg-3 col-xl">
+    <a href="{% url 'hall:hall_manage' %}" class="kpi-card h-100 text-decoration-none">
+      <div class="kpi-icon" style="background:rgba(34,197,94,.15);color:#4ade80;">
+        <i class="bi bi-building-check"></i>
+      </div>
+      <div class="kpi-value">{{ kpi_available_halls }}</div>
+      <div class="kpi-label">Available<br>Halls</div>
+    </a>
+  </div>
+
+  {# 2. Blocked Halls #}
+  <div class="col-6 col-md-4 col-lg-3 col-xl">
+    <a href="{% url 'hall:hall_manage' %}" class="kpi-card h-100 text-decoration-none">
+      <div class="kpi-icon" style="background:rgba(239,68,68,.15);color:#f87171;">
+        <i class="bi bi-slash-circle"></i>
+      </div>
+      <div class="kpi-value">{{ kpi_blocked_halls }}</div>
+      <div class="kpi-label">Blocked<br>Halls Today</div>
+      {% if kpi_blocked_halls > 0 %}
+        <span class="kpi-trend kpi-trend-down">Active blocks</span>
+      {% endif %}
+    </a>
+  </div>
+
+  {# 3. Maintenance Today #}
+  <div class="col-6 col-md-4 col-lg-3 col-xl">
+    <a href="{% url 'hall:hall_manage' %}" class="kpi-card h-100 text-decoration-none">
+      <div class="kpi-icon" style="background:rgba(245,158,11,.15);color:#fbbf24;">
+        <i class="bi bi-tools"></i>
+      </div>
+      <div class="kpi-value">{{ kpi_maintenance_today }}</div>
+      <div class="kpi-label">Maintenance<br>Today</div>
+    </a>
+  </div>
+
+  {# 4. Pending Facility Reviews #}
+  <div class="col-6 col-md-4 col-lg-3 col-xl">
+    <a href="#queue-section" class="kpi-card h-100 text-decoration-none">
+      <div class="kpi-icon" style="background:rgba(59,130,246,.15);color:#60a5fa;">
+        <i class="bi bi-clipboard2-check"></i>
+      </div>
+      <div class="kpi-value">{{ kpi_pending_reviews }}</div>
+      <div class="kpi-label">Pending Facility<br>Reviews</div>
+      {% if kpi_pending_reviews > 0 %}
+        <span class="kpi-trend kpi-trend-down">Needs attention</span>
+      {% endif %}
+    </a>
+  </div>
+
+  {# 5. Pending Post-Event Inspections #}
+  <div class="col-6 col-md-4 col-lg-3 col-xl">
+    <a href="#queue-section" class="kpi-card h-100 text-decoration-none">
+      <div class="kpi-icon" style="background:rgba(234,179,8,.15);color:#facc15;">
+        <i class="bi bi-clipboard-check"></i>
+      </div>
+      <div class="kpi-value">{{ kpi_pending_inspections }}</div>
+      <div class="kpi-label">Pending<br>Inspections</div>
+      {% if kpi_pending_inspections > 0 %}
+        <span class="kpi-trend kpi-trend-down">Action required</span>
+      {% endif %}
+    </a>
+  </div>
+
+  {# 6. Internal Reservations #}
+  <div class="col-6 col-md-4 col-lg-3 col-xl">
+    <a href="{% url 'reservations:internal_list' %}" class="kpi-card h-100 text-decoration-none">
+      <div class="kpi-icon" style="background:rgba(99,102,241,.15);color:#818cf8;">
+        <i class="bi bi-calendar2-week"></i>
+      </div>
+      <div class="kpi-value">{{ kpi_internal_count }}</div>
+      <div class="kpi-label">Internal<br>Reservations</div>
+    </a>
+  </div>
+
+  {# 7. Today's Events #}
+  <div class="col-6 col-md-4 col-lg-3 col-xl">
+    <a href="{% url 'reservations:calendar' %}" class="kpi-card h-100 text-decoration-none">
+      <div class="kpi-icon" style="background:rgba(16,185,129,.15);color:#34d399;">
+        <i class="bi bi-calendar-event"></i>
+      </div>
+      <div class="kpi-value">{{ kpi_todays_events }}</div>
+      <div class="kpi-label">Today's<br>Events</div>
+    </a>
+  </div>
+
+  {# 8. Upcoming Events #}
+  <div class="col-6 col-md-4 col-lg-3 col-xl">
+    <a href="{% url 'reservations:calendar' %}" class="kpi-card h-100 text-decoration-none">
+      <div class="kpi-icon" style="background:rgba(148,163,184,.12);color:#94a3b8;">
+        <i class="bi bi-calendar-range"></i>
+      </div>
+      <div class="kpi-value">{{ kpi_upcoming_events }}</div>
+      <div class="kpi-label">Upcoming<br>Events</div>
+    </a>
+  </div>
+
+</div>{# /KPI row #}
+
+{# ══════════════════════════════════════════════════════════════════ #}
+{# QUICK ACTIONS GRID                                                  #}
+{# ══════════════════════════════════════════════════════════════════ #}
+<div class="app-card mb-4 p-3">
+  <div class="section-hdr mb-3">
+    <div class="section-hdr-title"><i class="bi bi-lightning-charge"></i>Quick Actions</div>
+  </div>
+  <div class="row g-2 row-cols-4 row-cols-md-8">
+    <div class="col">
+      <a href="{% url 'reservations:my_reservations' %}?mode=master&status=FORWARDED" class="qa-tile">
+        <div class="qa-tile-icon" style="background:rgba(59,130,246,.15);color:#60a5fa;"><i class="bi bi-clipboard2-check"></i></div>
+        Review Booking
+      </a>
+    </div>
+    <div class="col">
+      <a href="{% url 'reservations:my_reservations' %}?mode=master&status=INSPECTION_PENDING" class="qa-tile">
+        <div class="qa-tile-icon" style="background:rgba(234,179,8,.15);color:#facc15;"><i class="bi bi-clipboard-check"></i></div>
+        Inspect Hall
+      </a>
+    </div>
+    <div class="col">
+      <a href="{% url 'hall:hall_manage' %}" class="qa-tile">
+        <div class="qa-tile-icon" style="background:rgba(245,158,11,.15);color:#fbbf24;"><i class="bi bi-tools"></i></div>
+        Schedule<br>Maintenance
+      </a>
+    </div>
+    <div class="col">
+      <a href="{% url 'hall:hall_manage' %}" class="qa-tile">
+        <div class="qa-tile-icon" style="background:rgba(239,68,68,.15);color:#f87171;"><i class="bi bi-slash-circle"></i></div>
+        Block Hall
+      </a>
+    </div>
+    <div class="col">
+      <a href="{% url 'reservations:calendar' %}?mode=facility" class="qa-tile">
+        <div class="qa-tile-icon" style="background:rgba(16,185,129,.15);color:#34d399;"><i class="bi bi-calendar3"></i></div>
+        View Hall<br>Calendar
+      </a>
+    </div>
+    <div class="col">
+      <a href="{% url 'reservations:availability_api' %}" class="qa-tile">
+        <div class="qa-tile-icon" style="background:rgba(99,102,241,.15);color:#818cf8;"><i class="bi bi-building-check"></i></div>
+        Hall<br>Availability
+      </a>
+    </div>
+    <div class="col">
+      <a href="{% url 'hall:amenity_manage' %}" class="qa-tile">
+        <div class="qa-tile-icon" style="background:rgba(168,85,247,.15);color:#c084fc;"><i class="bi bi-stars"></i></div>
+        Manage<br>Amenities
+      </a>
+    </div>
+    <div class="col">
+      <a href="{% url 'hall:hall_manage' %}" class="qa-tile">
+        <div class="qa-tile-icon" style="background:rgba(148,163,184,.12);color:#94a3b8;"><i class="bi bi-images"></i></div>
+        Hall Images
+      </a>
+    </div>
+  </div>
+</div>
+
+{# ══════════════════════════════════════════════════════════════════ #}
+{# ACTIVITY PANELS — 3 column                                          #}
+{# ══════════════════════════════════════════════════════════════════ #}
+<div class="row g-3 mb-4">
+
+  {# Panel 1: Upcoming Inspections #}
+  <div class="col-12 col-md-6 col-lg-4">
+    <div class="app-card h-100 p-3">
+      <div class="section-hdr">
+        <div class="section-hdr-title"><i class="bi bi-clipboard-check text-warning"></i>Upcoming Inspections</div>
+        <a href="{% url 'reservations:my_reservations' %}?mode=master&status=INSPECTION_PENDING" class="section-hdr-action">View all →</a>
+      </div>
+      {% if upcoming_inspection_qs %}
+        <ul class="activity-feed">
+          {% for r in upcoming_inspection_qs %}
+          <li class="activity-item">
+            <span class="activity-dot" style="background:#facc15;"></span>
+            <div class="flex-grow-1 min-w-0">
+              <div class="activity-title">
+                <a href="{% url 'reservations:detail' r.booking_reference %}" class="text-decoration-none text-body">
+                  {{ r.event_name|truncatechars:32|default:r.booking_reference }}
+                </a>
+              </div>
+              <div class="activity-meta">{{ r.hall.name|truncatechars:22 }} · {{ r.booking_date }}</div>
+            </div>
+            <a href="{% url 'reservations:detail' r.booking_reference %}" class="btn btn-xs btn-outline-warning flex-shrink-0">Inspect</a>
+          </li>
+          {% endfor %}
+        </ul>
+      {% else %}
+        <div class="empty-state py-3">
+          <div class="empty-icon"><i class="bi bi-clipboard-check"></i></div>
+          <h5>No pending inspections</h5>
+          <p>Completed events will appear here for inspection.</p>
+        </div>
+      {% endif %}
+    </div>
+  </div>
+
+  {# Panel 2: Forwarded Bookings Awaiting Review #}
+  <div class="col-12 col-md-6 col-lg-4">
+    <div class="app-card h-100 p-3">
+      <div class="section-hdr">
+        <div class="section-hdr-title"><i class="bi bi-arrow-right text-primary"></i>Awaiting Review</div>
+        <a href="{% url 'reservations:my_reservations' %}?mode=master&status=FORWARDED" class="section-hdr-action">View all →</a>
+      </div>
+      {% if recently_forwarded %}
+        <ul class="activity-feed">
+          {% for r in recently_forwarded %}
+          <li class="activity-item">
+            <span class="activity-dot" style="background:#60a5fa;"></span>
+            <div class="flex-grow-1 min-w-0">
+              <div class="activity-title">
+                <a href="{% url 'reservations:detail' r.booking_reference %}" class="text-decoration-none text-body">
+                  {{ r.event_name|truncatechars:32|default:r.booking_reference }}
+                </a>
+              </div>
+              <div class="activity-meta">{{ r.hall.name|truncatechars:22 }} · {{ r.booking_date }}</div>
+            </div>
+            {# Inline action: mark available #}
+            <form method="post" action="{% url 'reservations:facility_action' r.booking_reference %}" class="d-inline flex-shrink-0">
+              {% csrf_token %}<input type="hidden" name="action" value="facility_approve">
+              <button type="submit" class="btn btn-xs btn-success" title="Confirm Hall Available">
+                <i class="bi bi-check2"></i>
+              </button>
+            </form>
+          </li>
+          {% endfor %}
+        </ul>
+      {% else %}
+        <div class="empty-state py-3">
+          <div class="empty-icon"><i class="bi bi-inbox"></i></div>
+          <h5>No forwarded bookings</h5>
+          <p>Ventures will forward bookings here for facility review.</p>
+        </div>
+      {% endif %}
+    </div>
+  </div>
+
+  {# Panel 3: Maintenance Schedule & Notifications #}
+  <div class="col-12 col-md-6 col-lg-4">
+    <div class="app-card h-100 p-3">
+      <div class="section-hdr">
+        <div class="section-hdr-title"><i class="bi bi-tools text-warning"></i>Maintenance Schedule</div>
+        <a href="{% url 'hall:hall_manage' %}" class="section-hdr-action">Manage →</a>
+      </div>
+      {% if recent_blocks %}
+        <ul class="activity-feed">
+          {% for block in recent_blocks %}
+          <li class="activity-item">
+            <span class="activity-dot" style="background:#fbbf24;"></span>
+            <div class="flex-grow-1 min-w-0">
+              <div class="activity-title">{{ block.hall.name|truncatechars:28 }}</div>
+              <div class="activity-meta">
+                {{ block.start_date }} – {{ block.end_date }}
+                {% if block.reason %} · {{ block.reason|truncatechars:20 }}{% endif %}
+              </div>
+            </div>
+          </li>
+          {% endfor %}
+        </ul>
+      {% else %}
+        <div class="empty-state py-3">
+          <div class="empty-icon"><i class="bi bi-calendar-x"></i></div>
+          <h5>No active blocks</h5>
+          <p>Hall maintenance blocks will appear here.</p>
+        </div>
+      {% endif %}
+
+      {% if damage_reported %}
+      <div class="section-hdr mt-3">
+        <div class="section-hdr-title text-danger"><i class="bi bi-exclamation-triangle"></i>Damage Reports</div>
+      </div>
+      <ul class="activity-feed">
+        {% for r in damage_reported %}
+        <li class="activity-item">
+          <span class="activity-dot" style="background:#f87171;"></span>
+          <div class="flex-grow-1 min-w-0">
+            <div class="activity-title">
+              <a href="{% url 'reservations:detail' r.booking_reference %}" class="text-decoration-none text-body">
+                {{ r.event_name|truncatechars:28|default:r.booking_reference }}
+              </a>
+            </div>
+            <div class="activity-meta">{{ r.hall.name|truncatechars:22 }} · {{ r.booking_date }}</div>
+          </div>
+          <span class="status-pill badge-status-damage_reported flex-shrink-0">Damage</span>
+        </li>
+        {% endfor %}
+      </ul>
+      {% endif %}
+
+      {% if latest_notifications %}
+      <div class="section-hdr mt-3">
+        <div class="section-hdr-title"><i class="bi bi-bell"></i>Latest Alerts</div>
+        <a href="{% url 'notifications:inbox' %}" class="section-hdr-action">All →</a>
+      </div>
+      <ul class="activity-feed">
+        {% for notif in latest_notifications %}
+        <li class="activity-item">
+          <span class="activity-dot" style="background:#60a5fa;"></span>
+          <div class="flex-grow-1 min-w-0">
+            <div class="activity-title">{{ notif.message|truncatechars:45 }}</div>
+            <div class="activity-meta">{{ notif.created_at|timesince }} ago</div>
+          </div>
+        </li>
+        {% endfor %}
+      </ul>
+      {% endif %}
+    </div>
+  </div>
+
+</div>{# /activity panels #}
+
+{# ══════════════════════════════════════════════════════════════════ #}
+{# RESERVATION QUEUE — Tabbed section (legacy tables preserved)        #}
+{# ══════════════════════════════════════════════════════════════════ #}
+<div id="queue-section" class="app-card">
+  <div class="card-header d-flex justify-content-between align-items-center py-3">
+    <div class="fw-semibold"><i class="bi bi-list-check me-2"></i>Reservation Queue</div>
+    <a href="{% url 'reservations:my_reservations' %}?mode=master" class="btn btn-xs btn-outline-secondary">View all reservations</a>
+  </div>
+
+  {% if sections %}
+    {# Build tab navigation from non-empty sections #}
+    <div class="px-3 pt-3">
+      <div class="evms-tabs" id="facilityQueueTabs">
+        {% for title, qs, icon, color in sections %}
+          {% if qs %}
+          <a class="evms-tab {% if forloop.first %}active{% endif %}"
+             data-tab="facility-sec-{{ forloop.counter }}"
+             href="#facility-sec-{{ forloop.counter }}"
+             onclick="showTab(event,'facilityQueueTabs','facilityQueueBody')">
+            <i class="bi {{ icon }} me-1"></i>{{ title }}
+            <span class="badge text-bg-{{ color }} ms-1 fs-xs" style="font-size:0.65rem;">{{ qs|length }}</span>
+          </a>
+          {% endif %}
+        {% endfor %}
+      </div>
+    </div>
+
+    <div id="facilityQueueBody">
+      {% for title, qs, icon, color in sections %}
+        {% if qs %}
+        <div class="evms-tab-content {% if forloop.first %}active{% endif %}" id="facility-sec-{{ forloop.counter }}">
+          <div class="table-responsive">
+            <table class="table table-sm table-hover mb-0">
+              <thead>
+                <tr>
+                  <th>Reference</th>
+                  <th>Event</th>
+                  <th>Hall</th>
+                  <th>Date</th>
+                  <th>Applicant</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for r in qs|slice:":15" %}
+                <tr>
+                  <td><a href="{% url 'reservations:detail' r.booking_reference %}" class="font-monospace small text-info">{{ r.booking_reference|slice:"-12:" }}</a></td>
+                  <td class="small">{{ r.event_name|truncatechars:30 }}</td>
+                  <td class="small">{{ r.hall.name|truncatechars:22 }}</td>
+                  <td class="small text-nowrap">{{ r.booking_date }}</td>
+                  <td class="small">{{ r.user.get_full_name|default:r.user.email|truncatechars:18 }}</td>
+                  <td>
+                    <div class="d-flex gap-1 flex-wrap">
+                      <a href="{% url 'reservations:detail' r.booking_reference %}" class="btn btn-xs btn-outline-secondary" title="View details"><i class="bi bi-eye"></i></a>
+                      {% if r.status == "FORWARDED" or r.status == "UNDER_REVIEW" %}
+                      <form method="post" action="{% url 'reservations:facility_action' r.booking_reference %}" class="d-inline">
+                        {% csrf_token %}<input type="hidden" name="action" value="facility_approve">
+                        <button type="submit" class="btn btn-xs btn-success" title="Confirm Hall Available"><i class="bi bi-check2"></i> Available</button>
+                      </form>
+                      <form method="post" action="{% url 'reservations:facility_action' r.booking_reference %}" class="d-inline" onsubmit="return confirm('Reject this booking?')">
+                        {% csrf_token %}<input type="hidden" name="action" value="facility_reject">
+                        <button type="submit" class="btn btn-xs btn-outline-danger" title="Reject"><i class="bi bi-x"></i></button>
+                      </form>
+                      {% endif %}
+                      {% if r.status == "COMPLETED" %}
+                      <form method="post" action="{% url 'reservations:facility_action' r.booking_reference %}" class="d-inline">
+                        {% csrf_token %}<input type="hidden" name="action" value="open_inspection">
+                        <button type="submit" class="btn btn-xs btn-info" title="Open Inspection"><i class="bi bi-clipboard-check"></i> Inspect</button>
+                      </form>
+                      {% endif %}
+                      {% if r.status == "INSPECTION_PENDING" %}
+                      <a href="{% url 'reservations:detail' r.booking_reference %}#inspection" class="btn btn-xs btn-warning" title="Record inspection result"><i class="bi bi-pencil"></i> Record</a>
+                      {% endif %}
+                      {% if r.status == "INSPECTION_PENDING" or r.status == "DAMAGE_REPORTED" or r.status == "COMPLETED" %}
+                      <form method="post" action="{% url 'reservations:facility_action' r.booking_reference %}" class="d-inline" onsubmit="return confirm('Close this booking permanently without damage?')">
+                        {% csrf_token %}<input type="hidden" name="action" value="inspection_no_damage">
+                        <button type="submit" class="btn btn-xs btn-outline-secondary" title="Close Booking (No Damage)"><i class="bi bi-archive"></i></button>
+                      </form>
+                      {% endif %}
+                    </div>
+                  </td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+          {% if qs|length > 15 %}
+          <div class="text-center py-2 small text-body-secondary border-top">
+            <i class="bi bi-plus-circle me-1"></i>{{ qs|length|add:"-15" }} more —
+            <a href="{% url 'reservations:my_reservations' %}?mode=master">View all reservations</a>
+          </div>
+          {% endif %}
+        </div>
+        {% endif %}
+      {% endfor %}
+    </div>
+
+  {% else %}
+    {# All-clear empty state #}
+    <div class="empty-state p-5">
+      <div class="empty-icon text-success"><i class="bi bi-check2-circle"></i></div>
+      <h5>All clear — no pending facility work</h5>
+      <p>When Ventures forwards a booking, it will appear here for your review.</p>
+      <a href="{% url 'reservations:calendar' %}" class="btn btn-sm btn-outline-info">
+        <i class="bi bi-calendar3 me-1"></i>View Operations Calendar
+      </a>
+    </div>
+  {% endif %}
+</div>{# /queue-section #}
+
+<script>
+function showTab(e, tabsId, bodyId) {
+  e.preventDefault();
+  const target = e.currentTarget.dataset.tab;
+  document.querySelectorAll('#' + tabsId + ' .evms-tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('#' + bodyId + ' .evms-tab-content').forEach(c => c.classList.remove('active'));
+  e.currentTarget.classList.add('active');
+  const pane = document.getElementById(target);
+  if (pane) pane.classList.add('active');
+}
+</script>
+{% endblock %}

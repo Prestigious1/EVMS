@@ -1,0 +1,1241 @@
+{% extends "hall/base.html" %}
+{% block title %}{% if hall %}Edit {{ hall.name }}{% else %}Create Hall{% endif %}{% endblock %}
+
+{% block extra_head %}
+<style>
+/* ── Hall Form Tabs ────────────────────────────────────── */
+.hall-tab-nav {
+  display: flex;
+  gap: 0;
+  border-bottom: 2px solid rgba(255,255,255,0.08);
+  overflow-x: auto;
+  scrollbar-width: none;
+  margin-bottom: 1.5rem;
+}
+.hall-tab-nav::-webkit-scrollbar { display: none; }
+.hall-tab-btn {
+  flex-shrink: 0;
+  padding: 0.7rem 1.1rem;
+  border: none;
+  background: transparent;
+  color: var(--bs-body-secondary, #94a3b8);
+  font-size: 0.82rem;
+  font-weight: 500;
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -2px;
+  transition: all 0.18s ease;
+  white-space: nowrap;
+  display: flex; align-items: center; gap: 0.4rem;
+}
+.hall-tab-btn:hover { color: var(--evms-gold); }
+.hall-tab-btn.active {
+  color: var(--evms-gold);
+  border-bottom-color: var(--evms-gold);
+  font-weight: 600;
+}
+.hall-tab-pane { display: none; }
+.hall-tab-pane.active { display: block; }
+
+/* ── Gallery Grid ─────────────────────────────────────── */
+.gallery-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 0.75rem;
+}
+.gallery-item {
+  position: relative;
+  border-radius: 10px;
+  overflow: hidden;
+  aspect-ratio: 4/3;
+  border: 2px solid rgba(255,255,255,0.08);
+  transition: border-color 0.18s, transform 0.18s;
+  cursor: grab;
+  background: #1a2540;
+}
+.gallery-item:active { cursor: grabbing; }
+.gallery-item.is-cover { border-color: var(--evms-gold) !important; }
+.gallery-item.drag-over-target { border-color: var(--evms-blue-light); transform: scale(0.97); }
+.gallery-item.drag-src { opacity: 0.4; }
+.gallery-item img {
+  width: 100%; height: 100%;
+  object-fit: cover; display: block;
+  transition: transform 0.28s ease;
+}
+.gallery-item:hover img { transform: scale(1.05); }
+/* Cover badge */
+.cover-badge {
+  position: absolute; top: 5px; left: 5px;
+  background: var(--evms-gold); color: #000;
+  font-size: 0.6rem; font-weight: 700;
+  padding: 2px 7px; border-radius: 99px;
+  z-index: 5; pointer-events: none;
+  text-transform: uppercase; letter-spacing: 0.05em;
+}
+/* Drag handle */
+.drag-handle {
+  position: absolute; top: 5px; right: 5px;
+  background: rgba(0,0,0,0.55); color: #fff;
+  border: none; border-radius: 5px;
+  width: 22px; height: 22px;
+  font-size: 0.8rem;
+  display: flex; align-items: center; justify-content: center;
+  opacity: 0; transition: opacity 0.18s;
+  cursor: grab; z-index: 4;
+}
+.gallery-item:hover .drag-handle { opacity: 1; }
+/* Action bar that appears on hover */
+.gallery-item-actions {
+  position: absolute; bottom: 0; left: 0; right: 0;
+  background: linear-gradient(to top, rgba(0,0,0,0.85) 0%, rgba(0,0,0,0) 100%);
+  padding: 0.5rem 0.4rem 0.35rem;
+  display: flex; gap: 4px; justify-content: center;
+  opacity: 0; transition: opacity 0.2s;
+  z-index: 5;
+}
+.gallery-item:hover .gallery-item-actions { opacity: 1; }
+.gallery-item-actions button,
+.gallery-item-actions label {
+  border: none; border-radius: 5px;
+  padding: 3px 6px; font-size: 0.65rem; font-weight: 600;
+  cursor: pointer; white-space: nowrap; line-height: 1.2;
+  transition: background 0.14s;
+}
+.btn-set-cover { background: var(--evms-gold); color: #000; }
+.btn-set-cover:hover { background: var(--evms-gold-light); }
+.btn-del-img { background: rgba(239,68,68,0.9); color: #fff; }
+.btn-del-img:hover { background: #dc2626; }
+.btn-replace-img { background: rgba(59,130,246,0.9); color: #fff; }
+.btn-replace-img:hover { background: #2563eb; }
+.btn-preview-img { background: rgba(255,255,255,0.15); color: #fff; }
+.btn-preview-img:hover { background: rgba(255,255,255,0.28); }
+
+/* ── New upload drop zone ─────────────────────────────── */
+.img-drop-zone {
+  border: 2px dashed rgba(200,169,106,0.35);
+  border-radius: 12px;
+  padding: 2rem 1rem;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.22s ease;
+  background: rgba(200,169,106,0.03);
+  position: relative;
+}
+.img-drop-zone.drag-over {
+  border-color: var(--evms-gold);
+  background: rgba(200,169,106,0.08);
+}
+.img-drop-zone input[type="file"] {
+  position: absolute; inset: 0;
+  opacity: 0; cursor: pointer;
+  width: 100%; height: 100%;
+}
+
+/* ── Image preview grid (new uploads) ─────────────────── */
+.img-preview-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  gap: 0.6rem;
+  margin-top: 0.75rem;
+}
+.img-preview-item {
+  position: relative; border-radius: 10px;
+  overflow: hidden; aspect-ratio: 4/3;
+  border: 2px solid transparent; transition: border-color 0.18s;
+  cursor: grab;
+}
+.img-preview-item:active { cursor: grabbing; }
+.img-preview-item.drag-src { opacity: 0.4; }
+.img-preview-item img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.img-preview-item .order-badge {
+  position: absolute; bottom: 4px; left: 4px;
+  background: rgba(0,0,0,0.55); color: #fff;
+  font-size: 0.65rem; font-weight: 700;
+  border-radius: 99px; padding: 1px 6px;
+  pointer-events: none;
+}
+.img-preview-item .remove-btn {
+  position: absolute; top: 4px; right: 4px;
+  background: rgba(239,68,68,0.9); color: #fff;
+  border: none; border-radius: 50%;
+  width: 22px; height: 22px; font-size: 0.75rem;
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer; opacity: 0; transition: opacity 0.18s;
+  z-index: 5; padding: 0;
+}
+.img-preview-item:hover .remove-btn { opacity: 1; }
+
+/* ── Lightbox ─────────────────────────────────────────── */
+#imgLightbox {
+  display: none; position: fixed; inset: 0;
+  background: rgba(0,0,0,0.92); z-index: 9999;
+  align-items: center; justify-content: center;
+}
+#imgLightbox.open { display: flex; }
+#imgLightbox img {
+  max-width: 90vw; max-height: 90vh;
+  border-radius: 12px; object-fit: contain;
+}
+#imgLightbox .lb-close {
+  position: absolute; top: 1rem; right: 1.25rem;
+  background: rgba(255,255,255,0.12); border: none;
+  color: #fff; font-size: 1.5rem;
+  border-radius: 50%; width: 40px; height: 40px;
+  cursor: pointer; display: flex; align-items: center; justify-content: center;
+}
+
+/* ── Read-only field overlay for restricted roles ─────── */
+.field-locked { position: relative; }
+.field-locked::after {
+  content: '';
+  position: absolute; inset: 0;
+  background: rgba(0,0,0,0.35);
+  border-radius: var(--radius-sm);
+  cursor: not-allowed;
+  pointer-events: all;
+  z-index: 1;
+}
+.field-locked-notice {
+  font-size: 0.72rem; color: var(--evms-gold);
+  display: flex; align-items: center; gap: 4px; margin-top: 4px;
+}
+
+/* ── Audit log table ──────────────────────────────────── */
+.audit-row td { font-size: 0.75rem; vertical-align: middle; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-xl-10">
+
+    <!-- Breadcrumb -->
+    <nav aria-label="breadcrumb" class="mb-3">
+      <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="{% url 'hall:hall_manage' %}">Hall Management</a></li>
+        <li class="breadcrumb-item active">
+          {% if hall %}Edit: {{ hall.name }}{% else %}New Hall{% endif %}
+        </li>
+      </ol>
+    </nav>
+
+    <div class="d-flex align-items-center gap-3 mb-3">
+      <a href="{% url 'hall:hall_manage' %}" class="btn btn-sm btn-outline-secondary">
+        <i class="bi bi-arrow-left"></i>
+      </a>
+      <h1 class="h4 mb-0">
+        {% if hall %}Edit Hall — {{ hall.name }}{% else %}Create New Hall{% endif %}
+      </h1>
+      {% if hall %}
+        <span class="badge {{ hall.status_badge_class }}">{{ hall.status_label }}</span>
+      {% endif %}
+
+      <!-- Role permission indicator -->
+      <span class="ms-auto badge bg-secondary small">
+        <i class="bi bi-shield-check me-1"></i>
+        {% if user_role == "ADMIN" %}Admin — full access
+        {% elif user_role == "FACILITY" %}Facility — operational &amp; pricing owner
+        {% elif user_role == "VENTURES" %}Ventures — financial management
+        {% else %}{{ user_role }}
+        {% endif %}
+      </span>
+    </div>
+
+    <!-- ── Tab Navigation ── -->
+    <div class="hall-tab-nav" id="hallTabNav" role="tablist">
+      <button class="hall-tab-btn {% if active_tab == 'general' %}active{% endif %}"
+              data-tab="tab-general" id="btn-tab-general" role="tab" aria-selected="true">
+        <i class="bi bi-info-circle"></i> General
+      </button>
+      <button class="hall-tab-btn {% if active_tab == 'images' %}active{% endif %}"
+              data-tab="tab-images" id="btn-tab-images" role="tab">
+        <i class="bi bi-images"></i> Images
+        {% if hall %}
+          <span class="badge bg-secondary" style="font-size:0.6rem;">{{ hall.gallery_images.count }}</span>
+        {% endif %}
+      </button>
+      <button class="hall-tab-btn {% if active_tab == 'amenities' %}active{% endif %}"
+              data-tab="tab-amenities" id="btn-tab-amenities" role="tab">
+        <i class="bi bi-check2-square"></i> Amenities
+      </button>
+      <button class="hall-tab-btn {% if active_tab == 'pricing' %}active{% endif %}"
+              data-tab="tab-pricing" id="btn-tab-pricing" role="tab">
+        <i class="bi bi-cash-stack"></i> Pricing
+      </button>
+      <button class="hall-tab-btn {% if active_tab == 'availability' %}active{% endif %}"
+              data-tab="tab-availability" id="btn-tab-availability" role="tab">
+        <i class="bi bi-calendar-range"></i> Availability
+      </button>
+      <button class="hall-tab-btn {% if active_tab == 'policies' %}active{% endif %}"
+              data-tab="tab-policies" id="btn-tab-policies" role="tab">
+        <i class="bi bi-shield-check"></i> Policies
+      </button>
+      {% if hall %}
+      <button class="hall-tab-btn {% if active_tab == 'audit' %}active{% endif %}"
+              data-tab="tab-audit" id="btn-tab-audit" role="tab">
+        <i class="bi bi-clock-history"></i> Audit History
+      </button>
+      {% endif %}
+    </div>
+
+    <form method="post" enctype="multipart/form-data" novalidate id="hallForm">
+      {% csrf_token %}
+
+      <!-- ════════════════════════════════════════════ TAB 1: GENERAL ══ -->
+      <div class="hall-tab-pane {% if active_tab == 'general' or not active_tab %}active{% endif %}"
+           id="tab-general" role="tabpanel">
+
+        <div class="card app-card mb-4">
+          <div class="card-body">
+            <h5 class="h6 text-body-secondary text-uppercase fw-semibold mb-3">
+              <i class="bi bi-info-circle me-1"></i> Basic Information
+            </h5>
+
+            {# Helper macro for field-locked display #}
+            {% if user_role == "VENTURES" %}
+              <div class="alert alert-warning d-flex align-items-center gap-2 py-2 mb-3">
+                <i class="bi bi-lock-fill"></i>
+                <small>As Ventures, you can only edit <strong>Pricing</strong> fields. General fields are read-only.</small>
+              </div>
+            {% endif %}
+
+            <div class="row g-3">
+              <div class="col-md-8
+                {% if user_role == 'VENTURES' %}field-locked{% endif %}">
+                <label for="id_name" class="form-label fw-semibold">
+                  Hall Name <span class="text-danger">*</span>
+                </label>
+                <input type="text" id="id_name" name="name"
+                       class="form-control{% if form.name.errors %} is-invalid{% endif %}"
+                       value="{{ form.name.value|default:'' }}" required maxlength="200"
+                       placeholder="e.g., Eko Hall"
+                       {% if user_role == 'VENTURES' %}readonly{% endif %}>
+                {% if form.name.errors %}<div class="invalid-feedback">{{ form.name.errors.0 }}</div>{% endif %}
+                {% if user_role == "VENTURES" %}
+                  <div class="field-locked-notice"><i class="bi bi-lock"></i> Editable by Facility / Admin only</div>
+                {% endif %}
+              </div>
+              <div class="col-md-4 {% if user_role == 'VENTURES' %}field-locked{% endif %}">
+                <label for="id_category" class="form-label fw-semibold">Category</label>
+                <select id="id_category" name="category" class="form-select"
+                        {% if user_role == 'VENTURES' %}disabled{% endif %}>
+                  {% for val, label in form.fields.category.choices %}
+                    <option value="{{ val }}" {% if form.category.value == val %}selected{% endif %}>
+                      {{ label }}
+                    </option>
+                  {% endfor %}
+                </select>
+              </div>
+              <div class="col-md-4 {% if user_role == 'VENTURES' %}field-locked{% endif %}">
+                <label for="id_capacity" class="form-label fw-semibold">Capacity (seats)</label>
+                <input type="number" id="id_capacity" name="capacity" class="form-control"
+                       min="0" value="{{ form.capacity.value|default:'0' }}"
+                       {% if user_role == 'VENTURES' %}readonly{% endif %}>
+              </div>
+              <div class="col-md-4 {% if user_role == 'VENTURES' %}field-locked{% endif %}">
+                <label for="id_faculty" class="form-label fw-semibold">Faculty / Unit</label>
+                <input type="text" id="id_faculty" name="faculty" class="form-control" maxlength="200"
+                       value="{{ form.faculty.value|default:'' }}" placeholder="e.g., Faculty of Computing"
+                       {% if user_role == 'VENTURES' %}readonly{% endif %}>
+              </div>
+              <div class="col-md-4 {% if user_role == 'VENTURES' %}field-locked{% endif %}">
+                <label for="id_building" class="form-label fw-semibold">Building</label>
+                <input type="text" id="id_building" name="building" class="form-control" maxlength="200"
+                       value="{{ form.building.value|default:'' }}" placeholder="e.g., Block A"
+                       {% if user_role == 'VENTURES' %}readonly{% endif %}>
+              </div>
+              <div class="col-12 {% if user_role == 'VENTURES' %}field-locked{% endif %}">
+                <label for="id_location_description" class="form-label fw-semibold">Location Description</label>
+                <input type="text" id="id_location_description" name="location_description"
+                       class="form-control" maxlength="255"
+                       value="{{ form.location_description.value|default:'' }}"
+                       placeholder="e.g. Block A, Ground Floor, Near the Main Gate"
+                       {% if user_role == 'VENTURES' %}readonly{% endif %}>
+              </div>
+              <div class="col-12 {% if user_role == 'VENTURES' %}field-locked{% endif %}">
+                <label for="id_description" class="form-label fw-semibold">Description</label>
+                <textarea id="id_description" name="description"
+                          class="form-control {% if user_role != 'VENTURES' %}rich-editor{% endif %}"
+                          rows="4" placeholder="Describe the hall's features, suitable events, equipment, etc."
+                          {% if user_role == 'VENTURES' %}readonly{% endif %}>{{ form.description.value|default:'' }}</textarea>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Management & Status -->
+        <div class="card app-card mb-4">
+          <div class="card-body">
+            <h5 class="h6 text-body-secondary text-uppercase fw-semibold mb-3">
+              <i class="bi bi-building me-1"></i> Management &amp; Status
+            </h5>
+            <div class="row g-3">
+              <div class="col-md-6 {% if user_role == 'VENTURES' %}field-locked{% endif %}">
+                <label for="id_owner_department" class="form-label fw-semibold">Owning Department</label>
+                <select id="id_owner_department" name="owner_department" class="form-select"
+                        {% if user_role == 'VENTURES' %}disabled{% endif %}>
+                  <option value="">— Not assigned —</option>
+                  <option value="VENTURES" {% if form.owner_department.value == "VENTURES" %}selected{% endif %}>Ventures</option>
+                  <option value="FACILITY" {% if form.owner_department.value == "FACILITY" %}selected{% endif %}>Facility</option>
+                </select>
+              </div>
+              <div class="col-md-6 d-flex align-items-end {% if user_role == 'VENTURES' %}field-locked{% endif %}">
+                <div class="form-check form-switch ms-2">
+                  <input class="form-check-input" type="checkbox" id="id_is_active" name="is_active"
+                         {% if form.is_active.value %}checked{% endif %}
+                         {% if user_role == 'VENTURES' %}disabled{% endif %}>
+                  <label class="form-check-label fw-semibold" for="id_is_active">
+                    Hall is Active (publicly listed)
+                  </label>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Tab actions -->
+        <div class="d-flex gap-2 justify-content-end mb-4">
+          <a href="{% url 'hall:hall_manage' %}" class="btn btn-outline-secondary">Cancel</a>
+          <button type="submit" class="btn btn-primary px-4" id="submitBtn">
+            {% if hall %}<i class="bi bi-floppy me-1"></i> Save Changes
+            {% else %}<i class="bi bi-plus-circle me-1"></i> Create Hall{% endif %}
+          </button>
+        </div>
+      </div>
+
+      <!-- ════════════════════════════════════════════ TAB 2: IMAGES ══ -->
+      <div class="hall-tab-pane {% if active_tab == 'images' %}active{% endif %}"
+           id="tab-images" role="tabpanel">
+
+        {% if user_role == "VENTURES" %}
+          <div class="alert alert-warning d-flex align-items-center gap-2 py-2 mb-3">
+            <i class="bi bi-lock-fill"></i>
+            <small>As Ventures, you cannot manage hall images. Please contact Facility.</small>
+          </div>
+        {% else %}
+
+        <!-- Existing gallery -->
+        {% if hall_images %}
+        <div class="card app-card mb-4">
+          <div class="card-body">
+            <div class="d-flex align-items-center justify-content-between mb-3">
+              <h5 class="h6 text-body-secondary text-uppercase fw-semibold mb-0">
+                <i class="bi bi-images me-1"></i> Gallery
+                <span class="badge bg-secondary ms-1">{{ hall_images|length }}</span>
+              </h5>
+              <small class="text-body-secondary">
+                <i class="bi bi-grip-vertical me-1"></i>Drag to reorder •
+                <i class="bi bi-star me-1 text-warning"></i>Cover image shown in gold border
+              </small>
+            </div>
+            <div class="gallery-grid" id="existingGallery">
+              {% for img in hall_images %}
+              <div class="gallery-item {% if img.is_cover %}is-cover{% endif %}"
+                   data-img-id="{{ img.pk }}" data-hall-id="{{ hall.pk }}"
+                   data-order="{{ img.display_order }}"
+                   draggable="true">
+                {% if img.is_cover %}<span class="cover-badge"><i class="bi bi-star-fill"></i> Cover</span>{% endif %}
+                <span class="drag-handle" title="Drag to reorder"><i class="bi bi-grip-vertical"></i></span>
+                <img src="{{ img.image.url }}" alt="Gallery image" loading="lazy">
+                <div class="gallery-item-actions">
+                  {% if not img.is_cover %}
+                  <button type="button" class="btn-set-cover"
+                          data-img-id="{{ img.pk }}" data-hall-id="{{ hall.pk }}"
+                          title="Set as cover image">
+                    <i class="bi bi-star"></i> Cover
+                  </button>
+                  {% endif %}
+                  <button type="button" class="btn-preview-img"
+                          data-img-url="{{ img.image.url }}" title="Full screen preview">
+                    <i class="bi bi-fullscreen"></i>
+                  </button>
+                  <label class="btn-replace-img" title="Replace image">
+                    <i class="bi bi-arrow-repeat"></i>
+                    <input type="file" class="replace-img-input d-none"
+                           accept="image/jpeg,image/png,image/webp"
+                           data-img-id="{{ img.pk }}" data-hall-id="{{ hall.pk }}">
+                  </label>
+                  <button type="button" class="btn-del-img"
+                          data-img-id="{{ img.pk }}" data-hall-id="{{ hall.pk }}"
+                          title="Delete image">
+                    <i class="bi bi-trash"></i>
+                  </button>
+                </div>
+              </div>
+              {% endfor %}
+            </div>
+          </div>
+        </div>
+        {% endif %}
+
+        <!-- Upload new images -->
+        <div class="card app-card mb-4">
+          <div class="card-body">
+            <h5 class="h6 text-body-secondary text-uppercase fw-semibold mb-3">
+              <i class="bi bi-cloud-upload me-1"></i> Upload New Images
+            </h5>
+            <p class="small text-body-secondary mb-2">
+              <i class="bi bi-info-circle me-1"></i>
+              JPEG, PNG, WebP only. Max 5MB each. Drag to reorder before uploading.
+              {% if not hall_images %}First image will automatically be set as the cover.{% endif %}
+            </p>
+            <div class="img-drop-zone" id="dropZone">
+              <input type="file" id="id_images" name="images" multiple
+                     accept="image/jpeg,image/png,image/webp" aria-label="Upload hall images">
+              <div class="drop-hint">
+                <i class="bi bi-cloud-upload fs-2 mb-2 text-gold d-block"></i>
+                <span class="fw-semibold">Drag &amp; drop images here</span><br>
+                <small class="text-body-secondary">or click to browse your files</small>
+              </div>
+            </div>
+            <div id="newPreviewContainer"></div>
+          </div>
+        </div>
+
+        <!-- Save button for image tab -->
+        <div class="d-flex gap-2 justify-content-end mb-4">
+          <button type="submit" class="btn btn-primary px-4">
+            <i class="bi bi-floppy me-1"></i> Save Changes
+          </button>
+        </div>
+
+        {% endif %}
+      </div>
+
+      <!-- ═══════════════════════════════════════════ TAB 3: AMENITIES ══ -->
+      <div class="hall-tab-pane {% if active_tab == 'amenities' %}active{% endif %}"
+           id="tab-amenities" role="tabpanel">
+
+        {% if user_role == "VENTURES" %}
+          <div class="alert alert-warning d-flex align-items-center gap-2 py-2">
+            <i class="bi bi-lock-fill"></i>
+            <small>Amenities are managed by Facility or Admin.</small>
+          </div>
+        {% else %}
+        {% if amenities_all %}
+        <div class="card app-card mb-4">
+          <div class="card-body">
+            <h5 class="h6 text-body-secondary text-uppercase fw-semibold mb-3">
+              <i class="bi bi-check2-square me-1"></i> Amenities
+            </h5>
+            <input type="text" id="amenitySearch" class="form-control form-control-sm mb-3"
+                   placeholder="Filter amenities…" autocomplete="off">
+            <div class="row g-2" id="amenityGrid">
+              {% for amenity in amenities_all %}
+                <div class="col-sm-6 col-md-4 col-lg-3 amenity-item" data-name="{{ amenity.name|lower }}">
+                  <div class="form-check d-flex align-items-center gap-2">
+                    <input class="form-check-input mt-0" type="checkbox" name="amenities"
+                           id="amenity_{{ amenity.pk }}" value="{{ amenity.pk }}"
+                           {% if current_amenity_ids and amenity.pk in current_amenity_ids %}checked{% endif %}>
+                    <label class="form-check-label d-flex align-items-center gap-1" for="amenity_{{ amenity.pk }}">
+                      <i class="bi {{ amenity.icon }} text-primary"></i> {{ amenity.name }}
+                    </label>
+                  </div>
+                </div>
+              {% endfor %}
+            </div>
+          </div>
+        </div>
+        {% endif %}
+        <div class="d-flex gap-2 justify-content-end mb-4">
+          <button type="submit" class="btn btn-primary px-4">
+            <i class="bi bi-floppy me-1"></i> Save Changes
+          </button>
+        </div>
+        {% endif %}
+      </div>
+
+      <!-- ════════════════════════════════════════════ TAB 4: PRICING ══ -->
+      <div class="hall-tab-pane {% if active_tab == 'pricing' %}active{% endif %}"
+           id="tab-pricing" role="tabpanel">
+
+        {# Both Facility and Ventures can edit pricing. Facility is the operational owner
+           (including pricing authority). Ventures is the financial co-owner of pricing. #}
+
+        <div class="card app-card mb-4">
+          <div class="card-body">
+            <h5 class="h6 text-body-secondary text-uppercase fw-semibold mb-3">
+              <i class="bi bi-cash-stack me-1"></i> Pricing Configuration
+            </h5>
+            <div class="row g-3">
+              <div class="col-md-4">
+                <label for="id_daily_rate" class="form-label fw-semibold">Daily Rate (&#8358;)</label>
+                <div class="input-group">
+                  <span class="input-group-text">&#8358;</span>
+                  <input type="number" id="id_daily_rate" name="daily_rate"
+                         class="form-control{% if form.daily_rate.errors %} is-invalid{% endif %}"
+                         min="0" step="0.01" value="{{ form.daily_rate.value|default:'0' }}"
+                         {% if user_role not in 'ADMIN,FACILITY,VENTURES' %}readonly{% endif %}>
+                  {% if form.daily_rate.errors %}<div class="invalid-feedback">{{ form.daily_rate.errors.0 }}</div>{% endif %}
+                </div>
+              </div>
+              <div class="col-md-4">
+                <label for="id_extra_hour_charge" class="form-label fw-semibold">Extra Hour Charge (&#8358;)</label>
+                <div class="input-group">
+                  <span class="input-group-text">&#8358;</span>
+                  <input type="number" id="id_extra_hour_charge" name="extra_hour_charge"
+                         class="form-control{% if form.extra_hour_charge.errors %} is-invalid{% endif %}"
+                         min="0" step="0.01" value="{{ form.extra_hour_charge.value|default:'0' }}"
+                         {% if user_role not in 'ADMIN,FACILITY,VENTURES' %}readonly{% endif %}>
+                  {% if form.extra_hour_charge.errors %}<div class="invalid-feedback">{{ form.extra_hour_charge.errors.0 }}</div>{% endif %}
+                </div>
+              </div>
+              <div class="col-md-4">
+                <label for="id_security_deposit" class="form-label fw-semibold">Security Deposit (&#8358;)</label>
+                <div class="input-group">
+                  <span class="input-group-text">&#8358;</span>
+                  <input type="number" id="id_security_deposit" name="security_deposit"
+                         class="form-control{% if form.security_deposit.errors %} is-invalid{% endif %}"
+                         min="0" step="0.01" value="{{ form.security_deposit.value|default:'0' }}"
+                         {% if user_role not in 'ADMIN,FACILITY,VENTURES' %}readonly{% endif %}>
+                  {% if form.security_deposit.errors %}<div class="invalid-feedback">{{ form.security_deposit.errors.0 }}</div>{% endif %}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="d-flex gap-2 justify-content-end mb-4">
+          <button type="submit" class="btn btn-primary px-4">
+            <i class="bi bi-floppy me-1"></i> Save Changes
+          </button>
+        </div>
+      </div>
+
+      <!-- ══════════════════════════════════════════ TAB 5: AVAILABILITY ══ -->
+      <div class="hall-tab-pane {% if active_tab == 'availability' %}active{% endif %}"
+           id="tab-availability" role="tabpanel">
+        {% if hall %}
+        <div class="card app-card mb-4">
+          <div class="card-body">
+            <h5 class="h6 text-body-secondary text-uppercase fw-semibold mb-3">
+              <i class="bi bi-calendar-range me-1"></i> Hall Blocking
+            </h5>
+
+            {% if user_role == "VENTURES" %}
+              {# Ventures: read-only view only. No add/delete block controls. #}
+              <div class="alert alert-warning d-flex align-items-center gap-2 py-2 mb-3">
+                <i class="bi bi-lock-fill"></i>
+                <small>Hall blocking is managed by <strong>Facility</strong> and <strong>Admin</strong> only. Ventures cannot create or remove hall blocks.</small>
+              </div>
+              {% if hall.blocks.all %}
+                <div class="table-responsive">
+                  <table class="table table-sm">
+                    <thead><tr><th>From</th><th>To</th><th>Reason</th><th>Created By</th></tr></thead>
+                    <tbody>
+                      {% for block in hall.blocks.all %}
+                      <tr>
+                        <td>{{ block.start_date }}</td>
+                        <td>{{ block.end_date }}</td>
+                        <td>{{ block.reason|default:"&mdash;" }}</td>
+                        <td class="text-body-secondary small">{{ block.created_by|default:"&mdash;" }}</td>
+                      </tr>
+                      {% endfor %}
+                    </tbody>
+                  </table>
+                </div>
+              {% else %}
+                <p class="text-body-secondary small">No blocks currently set for this hall.</p>
+              {% endif %}
+
+            {% else %}
+              {# Facility and Admin: full block management interface #}
+              {% if hall.blocks.all %}
+                <div class="table-responsive mb-3">
+                  <table class="table table-sm">
+                    <thead><tr><th>From</th><th>To</th><th>Reason</th><th></th></tr></thead>
+                    <tbody>
+                      {% for block in hall.blocks.all %}
+                      <tr>
+                        <td>{{ block.start_date }}</td>
+                        <td>{{ block.end_date }}</td>
+                        <td>{{ block.reason|default:"&mdash;" }}</td>
+                        <td>
+                          <form method="post"
+                                action="{% url 'hall:hall_block_delete' hall.pk block.pk %}"
+                                style="display:inline"
+                                onsubmit="return confirm('Remove this block?');">
+                            {% csrf_token %}
+                            <button type="submit" class="btn btn-sm btn-outline-danger">
+                              <i class="bi bi-trash"></i>
+                            </button>
+                          </form>
+                        </td>
+                      </tr>
+                      {% endfor %}
+                    </tbody>
+                  </table>
+                </div>
+              {% else %}
+                <p class="text-body-secondary small">No blocks set. Add a block to prevent reservations on specific dates.</p>
+              {% endif %}
+              <hr>
+              <h6 class="fw-semibold mb-2">Add New Block</h6>
+              <form method="post" action="{% url 'hall:hall_block_add' hall.pk %}" class="row g-2 align-items-end">
+                {% csrf_token %}
+                <div class="col-md-4">
+                  <label class="form-label small">Start Date</label>
+                  <input type="date" name="start_date" class="form-control form-control-sm" required>
+                </div>
+                <div class="col-md-4">
+                  <label class="form-label small">End Date</label>
+                  <input type="date" name="end_date" class="form-control form-control-sm" required>
+                </div>
+                <div class="col-md-3">
+                  <label class="form-label small">Reason</label>
+                  <input type="text" name="reason" class="form-control form-control-sm"
+                         placeholder="e.g., Maintenance">
+                </div>
+                <div class="col-md-1">
+                  <button type="submit" class="btn btn-success btn-sm w-100">
+                    <i class="bi bi-plus"></i>
+                  </button>
+                </div>
+              </form>
+            {% endif %}
+
+          </div>
+        </div>
+        {% else %}
+          <div class="alert alert-info">Save the hall first to manage availability blocks.</div>
+        {% endif %}
+      </div>
+
+      <!-- ════════════════════════════════════════════ TAB 6: POLICIES ══ -->
+      <div class="hall-tab-pane {% if active_tab == 'policies' %}active{% endif %}"
+           id="tab-policies" role="tabpanel">
+
+        {% if user_role == "VENTURES" %}
+          {# Ventures: read-only view of policies. Cannot edit operational rules. #}
+          <div class="alert alert-info d-flex align-items-center gap-2 py-2 mb-3">
+            <i class="bi bi-info-circle-fill"></i>
+            <small>Usage policies are managed by <strong>Facility</strong> and <strong>Admin</strong>. You can view them below.</small>
+          </div>
+          <div class="card app-card mb-4">
+            <div class="card-body">
+              <h5 class="h6 text-body-secondary text-uppercase fw-semibold mb-3">
+                <i class="bi bi-shield-check me-1"></i> Usage Rules &amp; Terms (Read-Only)
+              </h5>
+              <div class="row g-3">
+                <div class="col-md-6">
+                  <label class="form-label fw-semibold">Usage Rules</label>
+                  <textarea class="form-control" rows="6" readonly>{{ form.rules.value|default:'' }}</textarea>
+                  <div class="form-text">Displayed to applicants before they submit a booking request.</div>
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label fw-semibold">Terms &amp; Conditions</label>
+                  <textarea class="form-control" rows="6" readonly>{{ form.terms.value|default:'' }}</textarea>
+                  <div class="form-text">Applicants must agree to these before confirming their booking.</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        {% else %}
+        <div class="card app-card mb-4">
+          <div class="card-body">
+            <h5 class="h6 text-body-secondary text-uppercase fw-semibold mb-3">
+              <i class="bi bi-shield-check me-1"></i> Usage Rules &amp; Terms
+            </h5>
+            <div class="row g-3">
+              <div class="col-md-6">
+                <label for="id_rules" class="form-label fw-semibold">Usage Rules</label>
+                <textarea id="id_rules" name="rules" class="form-control" rows="6"
+                          placeholder="Rules applicants must follow when using this hall.">{{ form.rules.value|default:'' }}</textarea>
+                <div class="form-text">Displayed to applicants before they submit a booking request.</div>
+              </div>
+              <div class="col-md-6">
+                <label for="id_terms" class="form-label fw-semibold">Terms &amp; Conditions</label>
+                <textarea id="id_terms" name="terms" class="form-control" rows="6"
+                          placeholder="Terms and conditions for using this hall.">{{ form.terms.value|default:'' }}</textarea>
+                <div class="form-text">Applicants must agree to these before confirming their booking.</div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="d-flex gap-2 justify-content-end mb-4">
+          <button type="submit" class="btn btn-primary px-4">
+            <i class="bi bi-floppy me-1"></i> Save Changes
+          </button>
+        </div>
+        {% endif %}
+      </div>
+
+      <!-- ══════════════════════════════════════════ TAB 7: AUDIT HISTORY ══ -->
+      {% if hall %}
+      <div class="hall-tab-pane {% if active_tab == 'audit' %}active{% endif %}"
+           id="tab-audit" role="tabpanel">
+        <div class="card app-card mb-4">
+          <div class="card-body">
+            <h5 class="h6 text-body-secondary text-uppercase fw-semibold mb-3">
+              <i class="bi bi-clock-history me-1"></i> Audit History
+              <span class="badge bg-secondary ms-1">{{ audit_logs|length }} recent</span>
+            </h5>
+            {% if audit_logs %}
+            <div class="table-responsive">
+              <table class="table table-sm table-hover">
+                <thead>
+                  <tr>
+                    <th>When</th><th>User</th><th>Role</th><th>Action</th><th>IP</th>
+                    <th>Changes</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for log in audit_logs %}
+                  <tr class="audit-row">
+                    <td class="text-body-secondary" style="white-space:nowrap;">
+                      {{ log.timestamp|date:"d M Y H:i" }}
+                    </td>
+                    <td>{{ log.user|default:"—" }}</td>
+                    <td>
+                      {% if log.role %}
+                        <span class="badge bg-secondary" style="font-size:0.6rem;">{{ log.role }}</span>
+                      {% else %}—{% endif %}
+                    </td>
+                    <td>{{ log.action }}</td>
+                    <td class="text-body-secondary">{{ log.ip_address|default:"—" }}</td>
+                    <td>
+                      {% if log.old_value or log.new_value %}
+                        <button type="button" class="btn btn-xs btn-outline-secondary py-0 px-1"
+                                style="font-size:0.65rem;"
+                                data-bs-toggle="popover"
+                                data-bs-placement="left"
+                                data-bs-html="true"
+                                data-bs-content="<strong>Before:</strong> {{ log.old_value|default:'—'|truncatechars:120 }}<br><strong>After:</strong> {{ log.new_value|default:'—'|truncatechars:120 }}">
+                          <i class="bi bi-eye"></i> Diff
+                        </button>
+                      {% else %}—{% endif %}
+                    </td>
+                  </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+            {% else %}
+              <p class="text-body-secondary small">No audit history yet for this hall.</p>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+      {% endif %}
+
+    </form>
+
+    <!-- ── Danger Zone (outside form) ── -->
+    {% if hall and is_admin %}
+    <div class="card border-danger mb-5" style="border-color:rgba(239,68,68,0.4)!important;">
+      <div class="card-body">
+        <h5 class="h6 text-danger fw-semibold mb-2">
+          <i class="bi bi-exclamation-triangle-fill me-1"></i> Danger Zone
+        </h5>
+        <p class="small text-body-secondary mb-2">
+          Permanent deletion cannot be undone. All reservations, images, and records will be lost.
+        </p>
+        <a href="{% url 'hall:hall_delete' hall.pk %}" class="btn btn-outline-danger btn-sm">
+          <i class="bi bi-trash3 me-1"></i> Permanently Delete Hall
+        </a>
+      </div>
+    </div>
+    {% elif hall and user_role == "FACILITY" %}
+    {# Facility is the operational owner — can archive and deactivate halls. #}
+    {# Ventures is the financial co-owner but does NOT control operational hall status. #}
+    <div class="card app-card mb-5">
+      <div class="card-body d-flex align-items-center justify-content-between gap-3">
+        <div>
+          <div class="fw-semibold mb-1">Archive this hall</div>
+          <p class="small text-body-secondary mb-0">
+            Archiving hides the hall from public listing and prevents new bookings,
+            but preserves all records. Only Admin can restore an archived hall.
+          </p>
+        </div>
+        <form method="post" action="{% url 'hall:hall_update' hall.pk %}"
+              onsubmit="return confirm('Archive {{ hall.name }}? It will be hidden from public listing.');">
+          {% csrf_token %}
+          <input type="hidden" name="action" value="archive">
+          <button type="submit" class="btn btn-outline-warning btn-sm text-nowrap">
+            <i class="bi bi-archive me-1"></i> Archive Hall
+          </button>
+        </form>
+        {% if hall.is_active %}
+        <form method="post" action="{% url 'hall:hall_update' hall.pk %}"
+              onsubmit="return confirm('Deactivate {{ hall.name }}?');">
+          {% csrf_token %}
+          <input type="hidden" name="action" value="deactivate">
+          <button type="submit" class="btn btn-outline-secondary btn-sm text-nowrap">
+            <i class="bi bi-toggle-off me-1"></i> Deactivate
+          </button>
+        </form>
+        {% endif %}
+      </div>
+    </div>
+    {% endif %}
+
+  </div>
+</div>
+
+<!-- Lightbox -->
+<div id="imgLightbox" role="dialog" aria-label="Image preview">
+  <button class="lb-close" id="lbClose" aria-label="Close"><i class="bi bi-x-lg"></i></button>
+  <img id="lbImg" src="" alt="Preview">
+</div>
+
+<!-- Hidden form for image actions -->
+<form id="imgActionForm" method="post" style="display:none;" enctype="multipart/form-data">
+  {% csrf_token %}
+</form>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function () {
+  'use strict';
+
+  // ── Tab switching ─────────────────────────────────────────────────
+  const tabNav = document.getElementById('hallTabNav');
+  if (tabNav) {
+    tabNav.querySelectorAll('.hall-tab-btn').forEach(function(btn) {
+      btn.addEventListener('click', function() {
+        // Deactivate all
+        tabNav.querySelectorAll('.hall-tab-btn').forEach(function(b) {
+          b.classList.remove('active');
+          b.setAttribute('aria-selected', 'false');
+        });
+        document.querySelectorAll('.hall-tab-pane').forEach(function(p) {
+          p.classList.remove('active');
+        });
+        // Activate clicked
+        btn.classList.add('active');
+        btn.setAttribute('aria-selected', 'true');
+        const target = document.getElementById(btn.dataset.tab);
+        if (target) target.classList.add('active');
+      });
+    });
+  }
+
+  // ── Amenity search ────────────────────────────────────────────────
+  const amenitySearch = document.getElementById('amenitySearch');
+  if (amenitySearch) {
+    amenitySearch.addEventListener('input', function() {
+      const q = this.value.toLowerCase().trim();
+      document.querySelectorAll('.amenity-item').forEach(function(item) {
+        item.style.display = (!q || item.dataset.name.includes(q)) ? '' : 'none';
+      });
+    });
+  }
+
+  // ── Toast helper ──────────────────────────────────────────────────
+  function showToast(type, msg) {
+    const ctn = document.querySelector('.toast-container') || (function() {
+      const c = document.createElement('div');
+      c.className = 'toast-container position-fixed bottom-0 end-0 p-3';
+      document.body.appendChild(c);
+      return c;
+    })();
+    const colors = { success: 'bg-success', warning: 'bg-warning text-dark', error: 'bg-danger', info: 'bg-info' };
+    const t = document.createElement('div');
+    t.className = 'toast align-items-center text-white border-0 show ' + (colors[type] || 'bg-info');
+    t.setAttribute('role', 'alert');
+    t.innerHTML = `<div class="d-flex"><div class="toast-body">${msg}</div>
+      <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button></div>`;
+    ctn.appendChild(t);
+    setTimeout(function() { t.remove(); }, 5000);
+  }
+
+  // ── Lightbox ──────────────────────────────────────────────────────
+  const lightbox = document.getElementById('imgLightbox');
+  const lbImg = document.getElementById('lbImg');
+  const lbClose = document.getElementById('lbClose');
+  function openLightbox(url) {
+    lbImg.src = url;
+    lightbox.classList.add('open');
+    document.body.style.overflow = 'hidden';
+  }
+  function closeLightbox() {
+    lightbox.classList.remove('open');
+    document.body.style.overflow = '';
+    lbImg.src = '';
+  }
+  if (lbClose) lbClose.addEventListener('click', closeLightbox);
+  if (lightbox) lightbox.addEventListener('click', function(e) {
+    if (e.target === lightbox) closeLightbox();
+  });
+  document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') closeLightbox();
+  });
+
+  // ── Gallery: Set Cover ────────────────────────────────────────────
+  document.querySelectorAll('.btn-set-cover').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      const imgId = this.dataset.imgId;
+      const hallId = this.dataset.hallId;
+      const url = `/halls/manage/${hallId}/image/${imgId}/set-cover/`;
+      fetch(url, {
+        method: 'POST',
+        headers: {
+          'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
+          'X-Requested-With': 'XMLHttpRequest',
+        }
+      }).then(function(r) { return r.json(); }).then(function(data) {
+        if (data.status === 'ok') {
+          // Update UI
+          document.querySelectorAll('.gallery-item').forEach(function(item) {
+            item.classList.remove('is-cover');
+            const badge = item.querySelector('.cover-badge');
+            if (badge) badge.remove();
+          });
+          const thisItem = document.querySelector(`.gallery-item[data-img-id="${imgId}"]`);
+          if (thisItem) {
+            thisItem.classList.add('is-cover');
+            thisItem.insertAdjacentHTML('afterbegin',
+              '<span class="cover-badge"><i class="bi bi-star-fill"></i> Cover</span>');
+            btn.remove(); // Remove the "set cover" button from this item
+          }
+          showToast('success', 'Cover image updated.');
+        }
+      }).catch(function() { showToast('error', 'Failed to update cover image.'); });
+    });
+  });
+
+  // ── Gallery: Preview ──────────────────────────────────────────────
+  document.querySelectorAll('.btn-preview-img').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      openLightbox(this.dataset.imgUrl);
+    });
+  });
+
+  // ── Gallery: Delete ───────────────────────────────────────────────
+  const imgActionForm = document.getElementById('imgActionForm');
+  document.querySelectorAll('.btn-del-img').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      if (!confirm('Delete this image? This cannot be undone.')) return;
+      const imgId = this.dataset.imgId;
+      const hallId = this.dataset.hallId;
+      const url = `/halls/manage/${hallId}/image/${imgId}/delete/`;
+      fetch(url, {
+        method: 'POST',
+        headers: {
+          'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
+          'X-Requested-With': 'XMLHttpRequest',
+        }
+      }).then(function(r) { return r.json(); }).then(function(data) {
+        if (data.status === 'ok') {
+          const item = document.querySelector(`.gallery-item[data-img-id="${imgId}"]`);
+          if (item) item.remove();
+          showToast('success', 'Image deleted.');
+        }
+      }).catch(function() {
+        // Fallback to form submission
+        imgActionForm.action = url;
+        imgActionForm.submit();
+      });
+    });
+  });
+
+  // ── Gallery: Replace ──────────────────────────────────────────────
+  document.querySelectorAll('.replace-img-input').forEach(function(input) {
+    input.addEventListener('change', function() {
+      if (!this.files.length) return;
+      const imgId = this.dataset.imgId;
+      const hallId = this.dataset.hallId;
+      const url = `/halls/manage/${hallId}/image/${imgId}/replace/`;
+      const fd = new FormData();
+      fd.append('image', this.files[0]);
+      fd.append('csrfmiddlewaretoken', document.querySelector('[name=csrfmiddlewaretoken]').value);
+      showToast('info', 'Uploading replacement image…');
+      fetch(url, { method: 'POST', body: fd })
+        .then(function() {
+          showToast('success', 'Image replaced. Refreshing…');
+          setTimeout(function() { window.location.reload(); }, 800);
+        })
+        .catch(function() { showToast('error', 'Replace failed.'); });
+    });
+  });
+
+  // ── Gallery: Drag-to-reorder existing images ──────────────────────
+  const existingGallery = document.getElementById('existingGallery');
+  if (existingGallery) {
+    let dragSrc = null;
+
+    existingGallery.querySelectorAll('.gallery-item').forEach(function(item) {
+      item.addEventListener('dragstart', function(e) {
+        dragSrc = item;
+        item.classList.add('drag-src');
+        e.dataTransfer.effectAllowed = 'move';
+      });
+      item.addEventListener('dragend', function() {
+        item.classList.remove('drag-src');
+        existingGallery.querySelectorAll('.gallery-item').forEach(function(i) {
+          i.classList.remove('drag-over-target');
+        });
+      });
+      item.addEventListener('dragover', function(e) {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'move';
+        if (dragSrc && dragSrc !== item) item.classList.add('drag-over-target');
+      });
+      item.addEventListener('dragleave', function() {
+        item.classList.remove('drag-over-target');
+      });
+      item.addEventListener('drop', function(e) {
+        e.preventDefault();
+        item.classList.remove('drag-over-target');
+        if (!dragSrc || dragSrc === item) return;
+
+        // Reorder in DOM
+        const items = Array.from(existingGallery.querySelectorAll('.gallery-item'));
+        const fromIdx = items.indexOf(dragSrc);
+        const toIdx = items.indexOf(item);
+        if (fromIdx < toIdx) {
+          existingGallery.insertBefore(dragSrc, item.nextSibling);
+        } else {
+          existingGallery.insertBefore(dragSrc, item);
+        }
+
+        // Persist order via API
+        const newOrder = Array.from(existingGallery.querySelectorAll('.gallery-item')).map(
+          function(el, idx) { return { id: parseInt(el.dataset.imgId), order: idx }; }
+        );
+        const hallId = item.dataset.hallId;
+        fetch(`/halls/manage/${hallId}/images/reorder/`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
+          },
+          body: JSON.stringify(newOrder),
+        }).then(function(r) { return r.json(); }).then(function(data) {
+          if (data.status === 'ok') showToast('success', 'Image order saved.');
+        }).catch(function() { showToast('error', 'Failed to save order.'); });
+      });
+    });
+  }
+
+  // ── New image uploads: drop zone + preview + reorder ─────────────
+  const dropZone = document.getElementById('dropZone');
+  const fileInput = document.getElementById('id_images');
+  const previewCtn = document.getElementById('newPreviewContainer');
+  const ALLOWED = ['image/jpeg', 'image/png', 'image/webp'];
+  const MAX_SIZE = 5 * 1024 * 1024;
+
+  let pendingFiles = [];
+
+  function syncFileInput() {
+    if (!fileInput) return;
+    const dt = new DataTransfer();
+    pendingFiles.forEach(function(f) { dt.items.add(f); });
+    fileInput.files = dt.files;
+  }
+
+  function buildPreview() {
+    if (!previewCtn) return;
+    previewCtn.innerHTML = '';
+    if (!pendingFiles.length) return;
+    const grid = document.createElement('div');
+    grid.className = 'img-preview-grid mt-3';
+    pendingFiles.forEach(function(file, idx) {
+      const card = document.createElement('div');
+      card.className = 'img-preview-item';
+      card.draggable = true;
+      card.dataset.idx = idx;
+
+      const img = document.createElement('img');
+      img.src = URL.createObjectURL(file);
+      img.alt = file.name;
+
+      const badge = document.createElement('span');
+      badge.className = 'order-badge';
+      badge.textContent = '#' + (idx + 1);
+
+      const rmBtn = document.createElement('button');
+      rmBtn.type = 'button';
+      rmBtn.className = 'remove-btn';
+      rmBtn.innerHTML = '<i class="bi bi-x"></i>';
+      rmBtn.addEventListener('click', function() {
+        pendingFiles.splice(idx, 1);
+        syncFileInput();
+        buildPreview();
+      });
+
+      card.appendChild(img);
+      card.appendChild(badge);
+      card.appendChild(rmBtn);
+      grid.appendChild(card);
+
+      card.addEventListener('dragstart', function(e) {
+        e.dataTransfer.setData('text/plain', idx);
+        card.classList.add('drag-src');
+      });
+      card.addEventListener('dragend', function() { card.classList.remove('drag-src'); });
+      card.addEventListener('dragover', function(e) {
+        e.preventDefault();
+        card.style.borderColor = 'var(--evms-gold)';
+      });
+      card.addEventListener('dragleave', function() { card.style.borderColor = ''; });
+      card.addEventListener('drop', function(e) {
+        e.preventDefault();
+        card.style.borderColor = '';
+        const fromIdx = parseInt(e.dataTransfer.getData('text/plain'), 10);
+        const toIdx = idx;
+        if (fromIdx === toIdx) return;
+        const moved = pendingFiles.splice(fromIdx, 1)[0];
+        pendingFiles.splice(toIdx, 0, moved);
+        syncFileInput();
+        buildPreview();
+      });
+    });
+    previewCtn.appendChild(grid);
+  }
+
+  function addFiles(files) {
+    Array.from(files).forEach(function(f) {
+      if (!ALLOWED.includes(f.type)) {
+        showToast('warning', '"' + f.name + '" skipped — only JPEG, PNG, WebP allowed.');
+        return;
+      }
+      if (f.size > MAX_SIZE) {
+        showToast('warning', '"' + f.name + '" skipped — exceeds 5MB limit.');
+        return;
+      }
+      pendingFiles.push(f);
+    });
+    syncFileInput();
+    buildPreview();
+  }
+
+  if (dropZone) {
+    dropZone.addEventListener('dragover', function(e) {
+      e.preventDefault();
+      dropZone.classList.add('drag-over');
+    });
+    dropZone.addEventListener('dragleave', function() { dropZone.classList.remove('drag-over'); });
+    dropZone.addEventListener('drop', function(e) {
+      e.preventDefault();
+      dropZone.classList.remove('drag-over');
+      addFiles(e.dataTransfer.files);
+    });
+  }
+  if (fileInput) {
+    fileInput.addEventListener('change', function() {
+      addFiles(this.files);
+      this.value = '';
+    });
+  }
+
+  // ── Popover init (audit diffs) ────────────────────────────────────
+  document.querySelectorAll('[data-bs-toggle="popover"]').forEach(function(el) {
+    new bootstrap.Popover(el, { trigger: 'click', sanitize: false });
+  });
+
+  // ── Dirty form guard ──────────────────────────────────────────────
+  const hallForm = document.getElementById('hallForm');
+  let formDirty = false;
+  if (hallForm) {
+    hallForm.addEventListener('input', function() { formDirty = true; });
+    hallForm.addEventListener('submit', function() { formDirty = false; });
+    window.addEventListener('beforeunload', function(e) {
+      if (formDirty) { e.preventDefault(); e.returnValue = ''; }
+    });
+  }
+
+})();
+</script>
+{% endblock %}

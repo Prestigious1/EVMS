@@ -1,0 +1,460 @@
+{% extends "hall/base.html" %}
+{% load auth_extras %}
+
+{% block extra_head %}
+<link href="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.15/index.global.min.css" rel="stylesheet">
+<style>
+  /* Calendar Theme Overrides */
+  .fc { border-radius: var(--radius-lg); overflow: hidden; }
+  .fc .fc-toolbar-title { font-size: 1.25rem; font-weight: 600; color: var(--evms-gold); }
+  .fc .fc-button-primary { background-color: var(--evms-blue); border-color: var(--evms-blue); }
+  .fc .fc-button-primary:hover { background-color: var(--evms-blue-mid); border-color: var(--evms-blue-mid); }
+  [data-bs-theme="dark"] .fc { --fc-page-bg-color: #1E293B; --fc-neutral-bg-color: #0F172A; --fc-neutral-text-color: #E2E8F0; --fc-border-color: rgba(255,255,255,0.07); }
+</style>
+{% endblock %}
+{% block content %}
+  <div class="row g-4">
+    <div class="col-lg-7">
+      <div class="card app-card overflow-hidden">
+        {% if hall_images %}
+          <div id="hallCarousel" class="carousel slide">
+            <div class="carousel-inner">
+              {% for img in hall_images %}
+                <div class="carousel-item {% if forloop.first %}active{% endif %}">
+                  <img src="{{ img.image.url }}" alt="{{ hall.name }} image {{ forloop.counter }}" style="height: 320px; object-fit: cover; width: 100%;">
+                </div>
+              {% endfor %}
+            </div>
+            <button class="carousel-control-prev" type="button" data-bs-target="#hallCarousel" data-bs-slide="prev">
+              <span class="carousel-control-prev-icon"></span>
+            </button>
+            <button class="carousel-control-next" type="button" data-bs-target="#hallCarousel" data-bs-slide="next">
+              <span class="carousel-control-next-icon"></span>
+            </button>
+          </div>
+          <div class="row g-2 p-3 pt-2">
+            {% for img in hall_images|slice:":6" %}
+              <div class="col-4 position-relative">
+                <img src="{{ img.image.url }}" class="rounded border w-100 {% if img.is_cover %}border-warning border-2{% endif %}" style="height:75px; object-fit:cover;" alt="">
+                {% if img.is_cover %}
+                  <span class="position-absolute top-0 start-0 badge bg-warning text-dark m-1" style="font-size: 0.5rem;"><i class="bi bi-star-fill"></i> COVER</span>
+                {% endif %}
+              </div>
+            {% endfor %}
+          </div>
+        {% elif cover_image %}
+          <img src="{{ cover_image.image.url }}" alt="{{ hall.name }}" style="height: 280px; object-fit: cover; width: 100%;">
+        {% else %}
+          <div class="w-100 d-flex align-items-center justify-content-center bg-secondary text-white" style="height: 280px;">
+            <i class="bi bi-building" style="font-size: 4rem; opacity: 0.5;"></i>
+          </div>
+        {% endif %}
+        <div class="card-body">
+          <div class="d-flex flex-wrap justify-content-between align-items-start gap-2">
+            <div>
+              <h1 class="h4 mb-1">{{ hall.name }}</h1>
+              <div class="text-body-secondary">{{ hall.faculty }} • {{ hall.building }}{% if hall.location_description %} • {{ hall.location_description }}{% endif %}</div>
+            </div>
+            <div class="d-flex gap-2 align-items-center">
+              <span class="badge text-bg-success">{{ hall.get_category_display }}</span>
+              {% if hall.owner_department %}
+                <span class="badge text-bg-secondary"><i class="bi bi-building"></i> {{ hall.get_owner_department_display }}</span>
+              {% endif %}
+            </div>
+          </div>
+
+          {# ── Key Metrics ── #}
+          <div class="row g-3 mt-1">
+            <div class="col-sm-4">
+              <div class="app-card p-3">
+                <div class="text-body-secondary small"><i class="bi bi-people"></i> Capacity</div>
+                <div class="fs-5 fw-semibold">{{ hall.capacity }} seats</div>
+              </div>
+            </div>
+            <div class="col-sm-4">
+              <div class="app-card p-3">
+                <div class="text-body-secondary small"><i class="bi bi-calendar-day"></i> Daily Rate</div>
+                <div class="fs-5 fw-semibold">
+                  {% if hall.daily_rate %}₦{{ hall.daily_rate }}{% else %}<span class="text-body-secondary small">TBD</span>{% endif %}
+                </div>
+              </div>
+            </div>
+            <div class="col-sm-4">
+              <div class="app-card p-3">
+                <div class="text-body-secondary small"><i class="bi bi-shield-lock"></i> Deposit</div>
+                <div class="fs-5 fw-semibold">
+                  {% if hall.security_deposit %}₦{{ hall.security_deposit }}{% else %}<span class="text-body-secondary small">None</span>{% endif %}
+                </div>
+              </div>
+            </div>
+            {% if hall.extra_hour_charge %}
+            <div class="col-sm-6">
+              <div class="app-card p-3">
+                <div class="text-body-secondary small"><i class="bi bi-clock"></i> Extra Hour Charge</div>
+                <div class="fw-semibold">₦{{ hall.extra_hour_charge }}/hr</div>
+              </div>
+            </div>
+            {% endif %}
+          </div>
+
+          {% if hall.description %}
+            <div class="mt-3">
+              <div class="fw-semibold mb-1">About this hall</div>
+              <div class="text-body-secondary">{{ hall.description|safe }}</div>
+            </div>
+          {% endif %}
+
+          {# ── Amenities ── #}
+          {% with amenities=hall.amenities.all %}
+          {% if amenities %}
+            <div class="mt-3">
+              <div class="fw-semibold mb-2"><i class="bi bi-stars"></i> Amenities</div>
+              <div class="d-flex flex-wrap gap-2">
+                {% for ha in amenities %}
+                  <span class="badge text-bg-secondary px-3 py-2">{{ ha.amenity.name }}</span>
+                {% endfor %}
+              </div>
+            </div>
+          {% endif %}
+          {% endwith %}
+
+          <!-- Availability Calendar Repositioned -->
+          <div class="mt-4 border border-secondary border-opacity-25 rounded p-3 app-card shadow-sm">
+            <h3 class="h6 fw-semibold mb-3"><i class="bi bi-calendar-week text-primary me-2"></i>Hall Availability</h3>
+            
+            <!-- Legend -->
+            <div class="d-flex flex-wrap gap-3 mb-3 small">
+              <div class="d-flex align-items-center gap-2"><span class="badge text-bg-success">Available</span></div>
+              <div class="d-flex align-items-center gap-2"><span class="badge text-bg-danger">Booked</span></div>
+              <div class="d-flex align-items-center gap-2"><span class="badge text-bg-warning text-dark">Pending</span></div>
+              <div class="d-flex align-items-center gap-2"><span class="badge text-bg-secondary" style="background-color: #4b5563 !important;">Blocked</span></div>
+              <div class="d-flex align-items-center gap-2"><span class="badge text-bg-primary">University Use</span></div>
+              <div class="d-flex align-items-center gap-2"><span class="badge" style="background-color: #a855f7;">Maintenance</span></div>
+            </div>
+            
+            <div id="availability-calendar" style="min-height: 400px;"></div>
+          </div>
+        </div>
+      </div>
+
+  {% if suggested_halls %}
+      <div class="mt-4">
+        <div class="d-flex justify-content-between align-items-end mb-2">
+          <h2 class="h5 mb-0">Suggested halls</h2>
+          <a class="btn btn-link btn-sm" href="{% url 'hall:hall_list' %}">See all halls</a>
+        </div>
+        <div class="row g-3">
+          {% for h in suggested_halls %}
+            <div class="col-md-6">
+              <div class="card app-card h-100">
+                <div class="card-body">
+                  <div class="d-flex justify-content-between align-items-start gap-2">
+                    <div>
+                      <div class="fw-semibold">{{ h.name }}</div>
+                      <div class="text-body-secondary small">{{ h.faculty }} • {{ h.building }}</div>
+                    </div>
+                    <span class="badge text-bg-success">{{ h.get_category_display }}</span>
+                  </div>
+                  <div class="mt-2 small">
+                    <div><i class="bi bi-people"></i> Capacity: <strong>{{ h.capacity }}</strong></div>
+                    {% if h.daily_rate %}
+                      <div><i class="bi bi-cash-coin"></i> ₦<strong>{{ h.daily_rate }}</strong>/day</div>
+                    {% endif %}
+                  </div>
+                </div>
+                <div class="card-footer bg-transparent border-0 pt-0">
+                  <a class="btn btn-outline-success w-100" href="{% url 'hall:hall_detail' h.id %}">View details</a>
+                </div>
+              </div>
+            </div>
+          {% endfor %}
+        </div>
+      </div>
+  {% endif %}
+    </div>
+
+    <div class="col-lg-5">
+      <div class="card app-card">
+        <div class="card-body">
+          <div class="d-flex justify-content-between align-items-center mb-2">
+            <h2 class="h5 mb-0">Book this hall</h2>
+            {% if request.user.is_authenticated %}
+              <div class="d-flex gap-2">
+                <form method="post" action="{% url 'hall:toggle_bookmark' hall.pk %}">
+                  {% csrf_token %}
+                  <button type="submit" class="btn btn-outline-success btn-sm">
+                    {% if bookmarked %}<i class="bi bi-bookmark-check"></i> Bookmarked{% else %}<i class="bi bi-bookmark"></i> Bookmark{% endif %}
+                  </button>
+                </form>
+                <button type="button" class="btn btn-outline-secondary btn-sm" id="copy-link"><i class="bi bi-link-45deg"></i> Copy link</button>
+              </div>
+            {% endif %}
+          </div>
+
+          {# ── Pricing note ── #}
+          <div class="alert alert-info small mb-3">
+            <i class="bi bi-info-circle me-1"></i>
+            <strong>How pricing works:</strong> The total cost is determined by LASU Ventures after reviewing your application. You will be notified once the amount is assigned.
+          </div>
+
+          {% if request.user|has_capability:"facility_workflow" or request.user.role == "ADMIN" %}
+          <div class="alert alert-secondary mt-3 p-3">
+            <h3 class="h6 mb-2"><i class="bi bi-calendar-x"></i> Manage Date Blocks</h3>
+            <p class="small text-body-secondary mb-2">Block dates to prevent any bookings (maintenance, special events, etc).</p>
+            <form method="post" action="{% url 'hall:hall_block_add' hall.id %}" class="row g-2 mb-3">
+              {% csrf_token %}
+              <div class="col-md-4">
+                <input type="date" class="form-control form-control-sm" name="start_date" required placeholder="Start Date">
+              </div>
+              <div class="col-md-4">
+                <input type="date" class="form-control form-control-sm" name="end_date" required placeholder="End Date">
+              </div>
+              <div class="col-md-4">
+                <button type="submit" class="btn btn-warning btn-sm w-100">Add Block</button>
+              </div>
+              <div class="col-12">
+                <input type="text" class="form-control form-control-sm" name="reason" placeholder="Reason (e.g. Maintenance)">
+              </div>
+            </form>
+            <div id="blocks-list" class="small vstack gap-2"></div>
+            <script>
+              fetch("{% url 'hall:hall_block_list' hall.id %}")
+                .then(r => r.json())
+                .then(blocks => {
+                  const container = document.getElementById("blocks-list");
+                  if (blocks.length === 0) {
+                    container.innerHTML = "<div class='text-body-secondary'>No active blocks.</div>";
+                    return;
+                  }
+                  blocks.forEach(b => {
+                    const div = document.createElement("div");
+                    div.className = "d-flex justify-content-between align-items-center bg-body p-2 rounded border";
+                    div.innerHTML = `
+                      <div>
+                        <strong>${b.start_date}</strong> to <strong>${b.end_date}</strong>
+                        <div class="text-body-secondary small">${b.reason || "No reason specified"}</div>
+                      </div>
+                      <form method="post" action="/halls/{{ hall.id }}/block/${b.id}/delete/" style="margin:0;">
+                        {% csrf_token %}
+                        <button type="submit" class="btn btn-sm btn-outline-danger" title="Remove block" onclick="return confirm('Remove this block?')"><i class="bi bi-trash"></i></button>
+                      </form>
+                    `;
+                    container.appendChild(div);
+                  });
+                });
+            </script>
+          </div>
+          {% endif %}
+
+          {% if not request.user.is_authenticated %}
+            <div class="alert alert-warning mb-0">
+              <a href="{% url 'users:login' %}" class="alert-link">Login</a> to reserve this hall.
+            </div>
+          {% else %}
+            {% if hall_rules %}
+              <div class="alert alert-info mb-3">
+                <strong>Rules & Guidelines</strong>
+                <p class="mb-0 small">{{ hall_rules|linebreaks }}</p>
+              </div>
+            {% endif %}
+            {% if hall_terms %}
+              <div class="alert alert-secondary mb-3">
+                <strong>Terms & Conditions</strong>
+                <p class="mb-0 small">{{ hall_terms|linebreaks }}</p>
+              </div>
+            {% endif %}
+
+
+
+            <form method="post" action="{% url 'reservations:create' hall.pk %}" id="reserve-form" class="mt-4" enctype="multipart/form-data">
+              {% csrf_token %}
+              <div class="vstack gap-3">
+                {% if form.non_field_errors %}
+                  <div class="alert alert-danger">{{ form.non_field_errors }}</div>
+                {% endif %}
+
+                <div class="fw-semibold">Event details</div>
+                <div class="vstack gap-2">
+                  <div>
+                    <label class="form-label" for="{{ form.event_name.id_for_label }}">{{ form.event_name.label }}</label>
+                    {{ form.event_name }}
+                    {% if form.event_name.errors %}<div class="text-danger small">{{ form.event_name.errors }}</div>{% endif %}
+                  </div>
+                  <div>
+                    <label class="form-label" for="{{ form.purpose.id_for_label }}">{{ form.purpose.label }}</label>
+                    {{ form.purpose }}
+                    {% if form.purpose.errors %}<div class="text-danger small">{{ form.purpose.errors }}</div>{% endif %}
+                  </div>
+                  <div>
+                    <label class="form-label" for="{{ form.attendees_count.id_for_label }}">{{ form.attendees_count.label }}</label>
+                    {{ form.attendees_count }}
+                    <div class="form-text">Hall capacity: {{ hall.capacity }} seats</div>
+                    {% if form.attendees_count.errors %}<div class="text-danger small">{{ form.attendees_count.errors }}</div>{% endif %}
+                  </div>
+                </div>
+
+                <div class="fw-semibold">Schedule</div>
+                <div class="row g-2">
+                  <div class="col-md-4">
+                    <label class="form-label" for="{{ form.booking_date.id_for_label }}">{{ form.booking_date.label }}</label>
+                    {{ form.booking_date }}
+                    {% if form.booking_date.errors %}<div class="text-danger small">{{ form.booking_date.errors }}</div>{% endif %}
+                  </div>
+                  <div class="col-md-4">
+                    <label class="form-label" for="{{ form.start_time.id_for_label }}">{{ form.start_time.label }}</label>
+                    {{ form.start_time }}
+                    {% if form.start_time.errors %}<div class="text-danger small">{{ form.start_time.errors }}</div>{% endif %}
+                  </div>
+                  <div class="col-md-4">
+                    <label class="form-label" for="{{ form.end_time.id_for_label }}">{{ form.end_time.label }}</label>
+                    {{ form.end_time }}
+                    {% if form.end_time.errors %}<div class="text-danger small">{{ form.end_time.errors }}</div>{% endif %}
+                  </div>
+                </div>
+
+                <div>
+                  <label class="form-label" for="{{ form.notes.id_for_label }}">{{ form.notes.label }}</label>
+                  {{ form.notes }}
+                  {% if form.notes.errors %}<div class="text-danger small">{{ form.notes.errors }}</div>{% endif %}
+                </div>
+
+                <div>
+                  <label class="form-label" for="{{ form.documents.id_for_label }}">{{ form.documents.label }}</label>
+                  {{ form.documents }}
+                  <div class="form-text">{{ form.documents.help_text }}</div>
+                  {% if form.documents.errors %}<div class="text-danger small">{{ form.documents.errors }}</div>{% endif %}
+                </div>
+
+                <div>
+                  <label class="form-label" for="{{ form.coupon_code.id_for_label }}">{{ form.coupon_code.label }} <span class="text-muted">(Optional)</span></label>
+                  <div class="input-group">
+                    {{ form.coupon_code }}
+                    <button class="btn btn-outline-secondary" type="button" id="check-coupon-btn">Validate</button>
+                  </div>
+                  <div id="coupon-feedback" class="form-text mt-1"></div>
+                  {% if form.coupon_code.errors %}<div class="text-danger small">{{ form.coupon_code.errors }}</div>{% endif %}
+                </div>
+
+                <div class="alert alert-secondary mb-0" id="availability">Select date/time to check availability.</div>
+
+                <button type="submit" class="btn btn-success btn-lg w-100">
+                  <i class="bi bi-check2-circle"></i> Submit reservation
+                </button>
+              </div>
+            </form>
+
+            <script>
+              (function(){
+                const copyBtn = document.getElementById("copy-link");
+                if (copyBtn) {
+                  copyBtn.addEventListener("click", function(){
+                    navigator.clipboard.writeText(window.location.href);
+                    copyBtn.textContent = "Copied!";
+                    setTimeout(() => copyBtn.innerHTML = '<i class="bi bi-link-45deg"></i> Copy link', 2000);
+                  });
+                }
+
+                function setAlert(id, text, variant) {
+                  const el = document.getElementById(id);
+                  if (!el) return;
+                  el.className = "alert alert-" + (variant || "secondary") + " mb-0";
+                  el.textContent = text;
+                }
+
+                function checkAvailability() {
+                  const bookingDate = document.querySelector('input[name="booking_date"]')?.value;
+                  const startTime = document.querySelector('input[name="start_time"]')?.value;
+                  const endTime = document.querySelector('input[name="end_time"]')?.value;
+                  if (!bookingDate || !startTime || !endTime) return;
+
+                  fetch("{% url 'reservations:availability_api' %}?hall_id={{ hall.id }}&booking_date=" + encodeURIComponent(bookingDate) + "&start_time=" + encodeURIComponent(startTime) + "&end_time=" + encodeURIComponent(endTime))
+                    .then(r => r.json().then(j => ({ok:r.ok, j})))
+                    .then(({ok, j}) => {
+                      if (!ok) return setAlert("availability", j.message || "Availability check failed.", "warning");
+                      const variant = j.available ? "success" : "danger";
+                      setAlert("availability", j.message || (j.available ? "Available" : "Already booked"), variant);
+                    })
+                    .catch(() => setAlert("availability", "Availability check failed.", "warning"));
+                }
+
+                document.addEventListener("change", function(e){
+                  const name = e.target?.name || "";
+                  if (["booking_date","start_time","end_time"].includes(name)) checkAvailability();
+                });
+
+                const form = document.getElementById("reserve-form");
+                if (form) {
+                  form.addEventListener("submit", function(e){
+                    const ok = confirm("Confirm reservation submission?");
+                    if (!ok) e.preventDefault();
+                  });
+                }
+                
+                const checkCouponBtn = document.getElementById("check-coupon-btn");
+                if (checkCouponBtn) {
+                  checkCouponBtn.addEventListener("click", function() {
+                    const couponCode = document.querySelector('input[name="coupon_code"]').value;
+                    const feedback = document.getElementById("coupon-feedback");
+                    if (!couponCode) {
+                      feedback.className = "form-text text-danger mt-1";
+                      feedback.textContent = "Please enter a coupon code.";
+                      return;
+                    }
+                    
+                    feedback.className = "form-text text-muted mt-1";
+                    feedback.textContent = "Validating...";
+                    
+                    fetch("{% url 'reservations:validate_coupon' %}?hall_id={{ hall.id }}&code=" + encodeURIComponent(couponCode))
+                      .then(r => r.json())
+                      .then(data => {
+                        if (data.valid) {
+                          feedback.className = "form-text text-success mt-1 fw-bold";
+                          feedback.textContent = data.message;
+                        } else {
+                          feedback.className = "form-text text-danger mt-1";
+                          feedback.textContent = data.message;
+                        }
+                      })
+                      .catch(() => {
+                        feedback.className = "form-text text-danger mt-1";
+                        feedback.textContent = "Error validating coupon. Please try again.";
+                      });
+                  });
+                }
+              })();
+            </script>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.15/index.global.min.js"></script>
+<script>
+  document.addEventListener("DOMContentLoaded", function () {
+    const calendarEl = document.getElementById("availability-calendar");
+    if (calendarEl) {
+      const calendar = new FullCalendar.Calendar(calendarEl, {
+        initialView: "dayGridMonth",
+        headerToolbar: {
+          left: "prev,next",
+          center: "title",
+          right: "today"
+        },
+        events: "{% url 'reservations:calendar_events' %}?hall_id={{ hall.id }}&mode=public",
+        nowIndicator: true,
+        height: "auto",
+        eventDidMount: function(info) {
+          const props = info.event.extendedProps;
+          if (props.status) {
+            info.el.setAttribute("title", info.event.title + " — " + props.status.replace(/_/g, " "));
+          }
+        },
+      });
+      calendar.render();
+    }
+  });
+</script>
+{% endblock %}

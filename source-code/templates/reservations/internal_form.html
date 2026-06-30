@@ -1,0 +1,127 @@
+{% extends "hall/base.html" %}
+{% load auth_extras %}
+{% block title %}{{ title }} - Internal Reservations{% endblock %}
+{% block nav_facility %}active{% endblock %}
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1>{{ title }}</h1>
+    <p class="page-subtitle">Schedule internal events, maintenance windows, or departmental bookings.</p>
+  </div>
+  <div class="d-flex gap-2">
+    <a href="{% url 'reservations:internal_list' %}" class="btn border text-body hover-lift"><i class="bi bi-arrow-left me-1"></i>Back to list</a>
+  </div>
+</div>
+
+<div class="row">
+  <div class="col-lg-8">
+    <div class="card app-card border-0 shadow-sm">
+      <div class="card-body p-4">
+        <form method="post">
+          {% csrf_token %}
+          
+          <h5 class="mb-3 text-gold">Department & Event Details</h5>
+          <div class="row g-3 mb-4">
+            <div class="col-md-6">
+              <label class="form-label fw-medium">{{ form.requesting_department.label }}</label>
+              {{ form.requesting_department }}
+              {% if form.requesting_department.errors %}<div class="text-danger small mt-1">{{ form.requesting_department.errors.0 }}</div>{% endif %}
+            </div>
+            <div class="col-md-6">
+              <label class="form-label fw-medium">{{ form.purpose.label }}</label>
+              {{ form.purpose }}
+              {% if form.purpose.errors %}<div class="text-danger small mt-1">{{ form.purpose.errors.0 }}</div>{% endif %}
+            </div>
+            <div class="col-12">
+              <label class="form-label fw-medium">{{ form.event_name.label }}</label>
+              {{ form.event_name }}
+              {% if form.event_name.errors %}<div class="text-danger small mt-1">{{ form.event_name.errors.0 }}</div>{% endif %}
+            </div>
+          </div>
+          
+          <h5 class="mb-3 text-gold">Contact Information</h5>
+          <div class="row g-3 mb-4">
+            <div class="col-md-6">
+              <label class="form-label fw-medium">{{ form.organizer_name.label }}</label>
+              {{ form.organizer_name }}
+              {% if form.organizer_name.errors %}<div class="text-danger small mt-1">{{ form.organizer_name.errors.0 }}</div>{% endif %}
+            </div>
+            <div class="col-md-6">
+              <label class="form-label fw-medium">{{ form.organizer_phone.label }}</label>
+              {{ form.organizer_phone }}
+              {% if form.organizer_phone.errors %}<div class="text-danger small mt-1">{{ form.organizer_phone.errors.0 }}</div>{% endif %}
+            </div>
+          </div>
+
+          <h5 class="mb-3 text-gold">Venue & Schedule</h5>
+          <div class="row g-3 mb-4">
+            <div class="col-md-6">
+              <label class="form-label fw-medium">{{ form.hall.label }}</label>
+              {{ form.hall }}
+              {% if form.hall.errors %}<div class="text-danger small mt-1">{{ form.hall.errors.0 }}</div>{% endif %}
+            </div>
+            <div class="col-md-6">
+              <label class="form-label fw-medium">{{ form.attendees_count.label }}</label>
+              {{ form.attendees_count }}
+              {% if form.attendees_count.errors %}<div class="text-danger small mt-1">{{ form.attendees_count.errors.0 }}</div>{% endif %}
+            </div>
+            <div class="col-md-4">
+              <label class="form-label fw-medium">{{ form.booking_date.label }}</label>
+              {{ form.booking_date }}
+              {% if form.booking_date.errors %}<div class="text-danger small mt-1">{{ form.booking_date.errors.0 }}</div>{% endif %}
+            </div>
+            <div class="col-md-4">
+              <label class="form-label fw-medium">{{ form.start_time.label }}</label>
+              {{ form.start_time }}
+              {% if form.start_time.errors %}<div class="text-danger small mt-1">{{ form.start_time.errors.0 }}</div>{% endif %}
+            </div>
+            <div class="col-md-4">
+              <label class="form-label fw-medium">{{ form.end_time.label }}</label>
+              {{ form.end_time }}
+              {% if form.end_time.errors %}<div class="text-danger small mt-1">{{ form.end_time.errors.0 }}</div>{% endif %}
+            </div>
+          </div>
+
+          <div class="row g-3 mb-4">
+            <div class="col-12">
+              <div class="form-check">
+                {{ form.is_recurring }}
+                <label class="form-check-label fw-medium" for="{{ form.is_recurring.id_for_label }}">{{ form.is_recurring.label }}</label>
+                <div class="text-muted small">{{ form.is_recurring.help_text }}</div>
+              </div>
+            </div>
+            <div class="col-12">
+              <label class="form-label fw-medium">{{ form.notes.label }}</label>
+              {{ form.notes }}
+              {% if form.notes.errors %}<div class="text-danger small mt-1">{{ form.notes.errors.0 }}</div>{% endif %}
+            </div>
+          </div>
+          
+          {% if form.non_field_errors %}
+          <div class="alert alert-danger mb-4">
+            {{ form.non_field_errors.0 }}
+          </div>
+          {% endif %}
+
+          <div class="d-flex justify-content-end gap-2">
+            <a href="{% url 'reservations:internal_list' %}" class="btn border text-body">Cancel</a>
+            <button type="submit" class="btn btn-gold px-4"><i class="bi bi-save me-1"></i> Save Internal Booking</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+  
+  <div class="col-lg-4">
+    <div class="alert alert-info border-0 shadow-sm mt-3 mt-lg-0">
+      <h5 class="alert-heading h6 fw-bold"><i class="bi bi-info-circle me-1"></i>About Internal Bookings</h5>
+      <p class="small mb-2">Internal reservations are designed for official university business, department use, or maintenance that block a hall's availability.</p>
+      <ul class="small mb-0 ps-3">
+        <li>They bypass the payment workflow.</li>
+        <li>They immediately appear on the calendar to prevent double-booking.</li>
+        <li>They are tracked in system reports.</li>
+      </ul>
+    </div>
+  </div>
+</div>
+{% endblock %}

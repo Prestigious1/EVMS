@@ -1,0 +1,36 @@
+{% extends "hall/base.html" %}
+{% load static %}
+{% block content %}
+  <div class="row justify-content-center">
+    <div class="col-md-7 col-lg-5">
+      <div class="card app-card">
+        <div class="card-body p-4">
+          <div class="text-center mb-3">
+            <img src="{% static 'images/lasu_logo.png' %}" alt="LASU logo" style="width:64px;height:64px;object-fit:contain;">
+            <h1 class="h4 mt-2 mb-1">Welcome back</h1>
+            <div class="text-body-secondary">Login to continue booking halls</div>
+          </div>
+
+          <form method="post" class="vstack gap-3">
+            {% csrf_token %}
+            <div>
+              <label class="form-label">Email or username</label>
+              <input class="form-control" type="text" name="email" required>
+            </div>
+            <div>
+              <label class="form-label">Password</label>
+              <input class="form-control" type="password" name="password" required>
+            </div>
+            <button class="btn btn-success btn-lg" type="submit"><i class="bi bi-box-arrow-in-right"></i> Login</button>
+          </form>
+
+          <div class="d-flex justify-content-between mt-3 small">
+            <a href="{% url 'users:password_reset' %}">Forgot password?</a>
+            <a href="{% url 'users:register' %}">Create an account</a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+{% endblock %}
+

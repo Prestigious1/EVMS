@@ -1,0 +1,42 @@
+{% extends "hall/base.html" %}
+{% block content %}
+  <div class="mb-3">
+    <h1 class="h4 mb-1">New Broadcast</h1>
+    <div class="text-body-secondary">Send an announcement to LASU users.</div>
+  </div>
+
+  <div class="card app-card">
+    <div class="card-body">
+      <form method="post" enctype="multipart/form-data">
+        {% csrf_token %}
+        <div class="vstack gap-3">
+          <div>
+            <label class="form-label" for="id_title">Title</label>
+            <input type="text" name="title" id="id_title" class="form-control" required maxlength="200">
+          </div>
+          <div>
+            <label class="form-label" for="id_message">Message</label>
+            <textarea name="message" id="id_message" class="form-control rich-editor" rows="5" required></textarea>
+          </div>
+          <div>
+            <label class="form-label" for="id_target_role">Target role (optional)</label>
+            <select name="target_role" id="id_target_role" class="form-select">
+              <option value="">All users</option>
+              {% for r in user_roles %}
+                <option value="{{ r.0 }}">{{ r.1 }}</option>
+              {% endfor %}
+            </select>
+            <div class="form-text">Leave blank to send to everyone. Choose a role to target specific users.</div>
+          </div>
+          <div>
+            <label class="form-label" for="id_attachment">Attachment (optional)</label>
+            <input type="file" name="attachment" id="id_attachment" class="form-control">
+            <div class="form-text">Attach a PDF, image, or document. Users will see a download link.</div>
+          </div>
+          <button type="submit" class="btn btn-success"><i class="bi bi-megaphone"></i> Send broadcast</button>
+          <a class="btn btn-outline-secondary" href="{% url 'notifications:broadcast_list' %}">Cancel</a>
+        </div>
+      </form>
+    </div>
+  </div>
+{% endblock %}

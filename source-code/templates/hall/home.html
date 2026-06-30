@@ -1,0 +1,517 @@
+{% extends "hall/base.html" %}
+{% load static %}
+{% block content %}
+
+<style>
+  /* ── Hall card with gradient overlay ── */
+  .hall-card-img-wrap {
+    position: relative;
+    height: 200px;
+    overflow: hidden;
+    border-radius: 16px 16px 0 0;
+    background: #1a2540;
+  }
+  .hall-card-img-wrap img {
+    width: 100%; height: 100%;
+    object-fit: cover;
+    display: block;
+    transition: transform 0.35s ease;
+  }
+  .hall-card-img-wrap:hover img { transform: scale(1.04); }
+  .hall-card-img-wrap .img-no-photo {
+    width: 100%; height: 100%;
+    display: flex; align-items: center; justify-content: center;
+    background: linear-gradient(135deg, #1a2540, #2b3f6b);
+  }
+  /* Dark gradient overlay — transparent top, dark bottom */
+  .hall-card-gradient {
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(
+      to bottom,
+      rgba(0,0,0,0)     0%,
+      rgba(0,0,0,0.08)  40%,
+      rgba(0,0,0,0.62)  80%,
+      rgba(0,0,0,0.80) 100%
+    );
+    border-radius: 16px 16px 0 0;
+    pointer-events: none;
+  }
+  /* Text pinned inside overlay at bottom of image */
+  .hall-card-overlay-text {
+    position: absolute;
+    bottom: 0; left: 0; right: 0;
+    padding: 0.75rem 1rem 0.65rem;
+    z-index: 2;
+  }
+  .hall-card-overlay-text .hall-name {
+    font-size: 0.95rem;
+    font-weight: 700;
+    color: #fff;
+    text-shadow: 0 1px 6px rgba(0,0,0,0.7);
+    margin-bottom: 2px;
+    line-height: 1.2;
+  }
+  .hall-card-overlay-text .hall-meta {
+    font-size: 0.7rem;
+    color: rgba(255,255,255,0.82);
+    text-shadow: 0 1px 4px rgba(0,0,0,0.6);
+    display: flex; gap: 0.6rem; flex-wrap: wrap; align-items: center;
+  }
+  .hall-card-overlay-text .hall-status {
+    position: absolute;
+    top: 0.6rem; right: 0.75rem;
+    font-size: 0.65rem;
+    font-weight: 700;
+    padding: 2px 7px;
+    border-radius: 99px;
+    background: rgba(34,197,94,0.9);
+    color: #fff;
+    text-shadow: none;
+    backdrop-filter: blur(4px);
+  }
+</style>
+
+<!-- ── Hero Carousel — Premium Venue Showcase ──────────────────────── -->
+<style>
+  /* ── Container ── */
+  #heroHallCarousel {
+    position: relative;
+    border-radius: 20px;
+    overflow: hidden;
+    box-shadow:
+      0 4px 6px  rgba(0,0,0,0.07),
+      0 12px 40px rgba(0,0,0,0.32),
+      0 32px 64px rgba(0,0,0,0.18);
+  }
+
+  /* ── Carousel image — always sharp, always full ── */
+  .hero-carousel-img {
+    width: 100%;
+    height: 420px;
+    object-fit: cover;
+    display: block;
+    /* No filters, no blur, no fade — the image IS the hero */
+  }
+  @media (max-width: 767.98px) { .hero-carousel-img { height: 300px; } }
+  @media (max-width: 575.98px) { .hero-carousel-img { height: 240px; } }
+
+  /* ── No-photo placeholder ── */
+  .hero-no-photo {
+    width: 100%;
+    height: 420px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(135deg, #0f1e38 0%, #1a3055 50%, #0d2442 100%);
+  }
+  @media (max-width: 767.98px) { .hero-no-photo { height: 300px; } }
+  @media (max-width: 575.98px) { .hero-no-photo { height: 240px; } }
+
+  /* ────────────────────────────────────────────────────────────────
+     STATUS BADGE — top right, modern pill
+  ──────────────────────────────────────────────────────────────── */
+  .hero-status-badge {
+    position: absolute;
+    top: 1rem;
+    right: 1rem;
+    z-index: 10;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    font-size: 0.68rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    padding: 0.3rem 0.75rem;
+    border-radius: 99px;
+    background: rgba(22, 163, 74, 0.82);  /* green-600 @82% */
+    color: #fff;
+    backdrop-filter: blur(8px) saturate(1.5);
+    -webkit-backdrop-filter: blur(8px) saturate(1.5);
+    box-shadow:
+      0 1px 3px  rgba(0,0,0,0.25),
+      0 4px 12px rgba(0,0,0,0.18),
+      inset 0 1px 0 rgba(255,255,255,0.15);
+    border: 1px solid rgba(255,255,255,0.18);
+    pointer-events: none;
+    transition: opacity 0.3s ease;
+  }
+  .hero-status-badge .badge-dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: #86efac;  /* green-300 */
+    box-shadow: 0 0 0 2px rgba(134,239,172,0.35);
+    animation: pulse-dot 2.2s ease-in-out infinite;
+  }
+  @keyframes pulse-dot {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50%       { opacity: 0.55; transform: scale(0.75); }
+  }
+
+  /* ────────────────────────────────────────────────────────────────
+     FLOATING INFO CARD — bottom left, glassmorphism
+     Auto-sized to content. Never stretches across the image.
+  ──────────────────────────────────────────────────────────────── */
+  .hero-info-card {
+    position: absolute;
+    bottom: 1.1rem;
+    left: 1.1rem;
+    z-index: 10;
+    /* Auto-size: grows with content, capped at ~50% of carousel width */
+    max-width: min(480px, 62%);
+    min-width: 0;
+
+    /* Glassmorphism */
+    background: rgba(10, 18, 35, 0.52);
+    backdrop-filter: blur(18px) saturate(1.6) brightness(0.9);
+    -webkit-backdrop-filter: blur(18px) saturate(1.6) brightness(0.9);
+
+    border-radius: 14px;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    box-shadow:
+      0 2px 4px  rgba(0,0,0,0.18),
+      0 8px 24px rgba(0,0,0,0.30),
+      inset 0 1px 0 rgba(255,255,255,0.08);
+
+    padding: 0.85rem 1.1rem 0.9rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.38rem;
+  }
+
+  @media (max-width: 575.98px) {
+    .hero-info-card {
+      bottom: 0.75rem;
+      left:   0.75rem;
+      right:  0.75rem;
+      max-width: none;   /* full width on tiny screens */
+      border-radius: 11px;
+      padding: 0.7rem 0.9rem 0.75rem;
+    }
+  }
+
+  /* ── Hall name inside card ── */
+  .hero-info-card .hic-name {
+    font-size: clamp(0.95rem, 1.9vw, 1.35rem);
+    font-weight: 800;
+    color: #ffffff;
+    letter-spacing: -0.015em;
+    line-height: 1.22;
+    margin: 0;
+    /* Crisp single-pixel text shadow for depth on any image */
+    text-shadow: 0 1px 3px rgba(0,0,0,0.50);
+    /* Truncate gracefully on very narrow screens */
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  @media (max-width: 575.98px) {
+    /* Allow wrap on mobile since card is full-width */
+    .hero-info-card .hic-name { white-space: normal; }
+  }
+
+  /* ── Meta row (faculty • building) ── */
+  .hero-info-card .hic-meta {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    flex-wrap: wrap;
+    font-size: clamp(0.68rem, 1.2vw, 0.8rem);
+    font-weight: 500;
+    color: rgba(203, 213, 225, 0.92);  /* slate-300 @ 92% */
+    margin: 0;
+    line-height: 1.4;
+  }
+  .hero-info-card .hic-meta i {
+    font-size: 0.75em;
+    opacity: 0.8;
+  }
+  .hero-info-card .hic-sep {
+    opacity: 0.45;
+    font-size: 0.7em;
+  }
+
+  /* ────────────────────────────────────────────────────────────────
+     CIRCULAR CAROUSEL CONTROLS
+  ──────────────────────────────────────────────────────────────── */
+  #heroHallCarousel .carousel-control-prev,
+  #heroHallCarousel .carousel-control-next {
+    /* Vertically centred, away from info card zone */
+    top: 50%;
+    bottom: auto;
+    transform: translateY(-50%);
+    width: 2.5rem;
+    height: 2.5rem;
+    border-radius: 50%;
+    background: rgba(255,255,255,0.14);
+    backdrop-filter: blur(10px) saturate(1.4);
+    -webkit-backdrop-filter: blur(10px) saturate(1.4);
+    border: 1px solid rgba(255,255,255,0.20);
+    box-shadow: 0 2px 12px rgba(0,0,0,0.30);
+    opacity: 0.85;
+    transition:
+      background  0.2s ease,
+      opacity     0.2s ease,
+      transform   0.2s cubic-bezier(0.34, 1.56, 0.64, 1),
+      box-shadow  0.2s ease;
+  }
+  #heroHallCarousel .carousel-control-prev { left:  0.85rem; }
+  #heroHallCarousel .carousel-control-next { right: 0.85rem; }
+
+  #heroHallCarousel .carousel-control-prev:hover,
+  #heroHallCarousel .carousel-control-next:hover {
+    background: rgba(255,255,255,0.24);
+    opacity: 1;
+    transform: translateY(-50%) scale(1.10);
+    box-shadow: 0 4px 20px rgba(0,0,0,0.38);
+  }
+  #heroHallCarousel .carousel-control-prev:active,
+  #heroHallCarousel .carousel-control-next:active {
+    transform: translateY(-50%) scale(0.94);
+  }
+  /* Icon sizing */
+  #heroHallCarousel .carousel-control-prev-icon,
+  #heroHallCarousel .carousel-control-next-icon {
+    width: 1rem; height: 1rem;
+    filter: drop-shadow(0 1px 2px rgba(0,0,0,0.5));
+  }
+
+  /* ────────────────────────────────────────────────────────────────
+     DOT INDICATORS — bottom centre, above info card on mobile
+  ──────────────────────────────────────────────────────────────── */
+  #heroHallCarousel .carousel-indicators {
+    bottom: 0.65rem;
+    margin-bottom: 0;
+    /* Push dots to right so they don't overlap the bottom-left card */
+    justify-content: flex-end;
+    padding-right: 1rem;
+    gap: 0.3rem;
+  }
+  #heroHallCarousel .carousel-indicators [data-bs-target] {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    border: none;
+    background: rgba(255,255,255,0.45);
+    margin: 0;
+    transition: background 0.25s ease, transform 0.25s ease, width 0.25s ease;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+  }
+  #heroHallCarousel .carousel-indicators .active {
+    background: #ffffff;
+    width: 18px;
+    border-radius: 3px;
+    transform: none;
+  }
+  @media (max-width: 575.98px) {
+    /* On mobile (full-width card) hide dots to avoid overlap */
+    #heroHallCarousel .carousel-indicators { display: none; }
+  }
+</style>
+
+<div class="hero p-4 p-md-5 mb-4">
+  {% if hero_halls %}
+  <div id="heroHallCarousel" class="carousel slide carousel-fade mb-4"
+       data-bs-ride="carousel" data-bs-interval="3500">
+
+    <!-- Dot indicators (right-aligned to avoid overlapping the info card) -->
+    <div class="carousel-indicators">
+      {% for hh in hero_halls %}
+        <button type="button"
+                data-bs-target="#heroHallCarousel"
+                data-bs-slide-to="{{ forloop.counter0 }}"
+                {% if forloop.first %}class="active" aria-current="true"{% endif %}
+                aria-label="{{ hh.name }}">
+        </button>
+      {% endfor %}
+    </div>
+
+    <div class="carousel-inner">
+      {% for hh in hero_halls %}
+        <div class="carousel-item{% if forloop.first %} active{% endif %}">
+
+          <!-- ① The hall image — sharp, unobstructed, always the hero element -->
+          {% with hh.cover_image as cover %}
+            {% if cover %}
+              <img src="{{ cover.image.url }}"
+                   class="hero-carousel-img"
+                   alt="{{ hh.name }}">
+            {% elif hh.image %}
+              <img src="{{ hh.image.url }}"
+                   class="hero-carousel-img"
+                   alt="{{ hh.name }}">
+            {% else %}
+              <div class="hero-no-photo">
+                <i class="bi bi-building" style="font-size:5rem;color:rgba(255,255,255,0.15);"></i>
+              </div>
+            {% endif %}
+          {% endwith %}
+
+          <!-- ② Status badge — top right -->
+          <div class="hero-status-badge" aria-hidden="true">
+            <span class="badge-dot"></span>
+            Active
+          </div>
+
+          <!-- ③ Floating glassmorphism info card — bottom left, auto-sized -->
+          <div class="hero-info-card" role="region" aria-label="Hall information">
+            <div class="hic-name" title="{{ hh.name }}">{{ hh.name }}</div>
+            <div class="hic-meta">
+              <i class="bi bi-mortarboard-fill" aria-hidden="true"></i>
+              <span>{{ hh.faculty }}</span>
+              <span class="hic-sep" aria-hidden="true">•</span>
+              <i class="bi bi-geo-alt-fill" aria-hidden="true"></i>
+              <span>{{ hh.building }}</span>
+            </div>
+          </div>
+
+        </div>
+      {% endfor %}
+    </div>
+
+    <!-- Circular prev / next controls -->
+    <button class="carousel-control-prev" type="button"
+            data-bs-target="#heroHallCarousel" data-bs-slide="prev"
+            aria-label="Previous hall">
+      <span class="carousel-control-prev-icon" aria-hidden="true"></span>
+    </button>
+    <button class="carousel-control-next" type="button"
+            data-bs-target="#heroHallCarousel" data-bs-slide="next"
+            aria-label="Next hall">
+      <span class="carousel-control-next-icon" aria-hidden="true"></span>
+    </button>
+
+  </div>
+  {% endif %}
+
+  <div class="row align-items-center g-4">
+    <div class="col-md-7">
+      <h1 class="display-6 fw-bold mb-2">LASU Electronic Venue Management System</h1>
+      <p class="lead mb-3">
+        Find the right hall, reserve by date and time, and get instant booking — built for academic scheduling and events.
+      </p>
+      <div class="d-flex flex-wrap gap-2">
+        <a class="btn btn-success btn-lg" href="{% url 'hall:hall_list' %}"><i class="bi bi-search"></i> Browse halls</a>
+        {% if request.user.is_authenticated %}
+          <a class="btn btn-outline-success btn-lg" href="{% url 'hall:dashboard' %}"><i class="bi bi-speedometer2"></i> Go to dashboard</a>
+        {% else %}
+          <a class="btn btn-outline-success btn-lg" href="{% url 'users:login' %}"><i class="bi bi-box-arrow-in-right"></i> Login</a>
+          <a class="btn btn-light btn-lg" href="{% url 'users:register' %}"><i class="bi bi-person-plus"></i> Create account</a>
+        {% endif %}
+      </div>
+    </div>
+    <div class="col-md-5">
+      <div class="row g-2">
+        <div class="col-6">
+          <div class="app-card p-3 text-center h-100 hover-lift">
+            <div class="display-6 fw-bold text-success">{{ total_halls }}</div>
+            <div class="text-body-secondary small">Available Halls</div>
+          </div>
+        </div>
+        <div class="col-6">
+          <div class="app-card p-3 text-center h-100 hover-lift">
+            <div class="display-6 fw-bold text-primary">{{ completed_events }}</div>
+            <div class="text-body-secondary small">Events Hosted</div>
+          </div>
+        </div>
+        <div class="col-12">
+          <div class="app-card p-3 d-flex align-items-center justify-content-between hover-lift">
+            <div>
+              <div class="fw-semibold text-warning"><i class="bi bi-people-fill me-1"></i> Active Community</div>
+              <div class="text-body-secondary small">Students, Staff &amp; Organizations</div>
+            </div>
+            <div class="fs-4 fw-bold">{{ active_users }}</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="d-flex justify-content-between align-items-end mb-3">
+  <div>
+    <h2 class="h4 mb-1">Featured halls</h2>
+    <div class="text-body-secondary">Popular options across faculties</div>
+  </div>
+  <a class="btn btn-outline-secondary btn-sm" href="{% url 'hall:hall_list' %}">View all</a>
+</div>
+
+<div class="row g-3">
+  {% for hall in halls %}
+    <div class="col-md-6 col-lg-4">
+      <div class="card app-card h-100 hover-lift overflow-hidden">
+        {% with hall.cover_image as cover %}
+        <div class="hall-card-img-wrap">
+          {% if cover %}
+            <img src="{{ cover.image.url }}" alt="{{ hall.name }}" loading="lazy">
+          {% elif hall.image %}
+            <img src="{{ hall.image.url }}" alt="{{ hall.name }}" loading="lazy">
+          {% else %}
+            <div class="img-no-photo">
+              <i class="bi bi-building text-white" style="font-size:2.5rem;opacity:0.4;"></i>
+            </div>
+          {% endif %}
+          <div class="hall-card-gradient"></div>
+          <div class="hall-card-overlay-text">
+            <span class="hall-status"><i class="bi bi-check-circle-fill me-1"></i>Active</span>
+            <div class="hall-name">{{ hall.name }}</div>
+            <div class="hall-meta">
+              <span><i class="bi bi-people"></i> {{ hall.capacity }}</span>
+              {% if hall.daily_rate %}
+                <span><i class="bi bi-cash-coin"></i> ₦{{ hall.daily_rate }}/day</span>
+              {% endif %}
+              <span class="badge" style="background:rgba(255,255,255,0.18);font-size:0.6rem;">
+                {{ hall.get_category_display }}
+              </span>
+            </div>
+          </div>
+        </div>
+        {% endwith %}
+        <div class="card-body pt-2">
+          <div class="text-body-secondary small"><i class="bi bi-geo-alt"></i> {{ hall.faculty }} • {{ hall.building }}</div>
+        </div>
+        <div class="card-footer bg-transparent border-0 pt-0">
+          <a class="btn btn-outline-success w-100" href="{% url 'hall:hall_detail' hall.pk %}">View &amp; book</a>
+        </div>
+      </div>
+    </div>
+  {% empty %}
+    <div class="col-12">
+      <div class="alert alert-secondary">No halls yet. Add halls in admin to populate the catalog.</div>
+    </div>
+  {% endfor %}
+</div>
+
+<div class="d-flex justify-content-between align-items-end mt-4 mb-3">
+  <div>
+    <h2 class="h4 mb-1">Latest Announcements</h2>
+    <div class="text-body-secondary">Official updates from LASU hall administration</div>
+  </div>
+  <a class="btn btn-outline-secondary btn-sm" href="{% url 'hall:announcements' %}">View all</a>
+</div>
+<div class="row g-3">
+  {% for a in announcements %}
+    <div class="col-md-6 col-lg-4">
+      <a href="{% url 'hall:announcement_detail' a.id %}" class="text-decoration-none text-body">
+        <div class="card app-card h-100 hover-lift">
+          {% if a.image %}
+            <img src="{{ a.image.url }}" class="card-img-top" style="height:170px; object-fit:cover;" alt="{{ a.title }}">
+          {% endif %}
+          <div class="card-body d-flex flex-column">
+            <div class="fw-semibold">{{ a.title }}</div>
+            <div class="small text-body-secondary mb-2">{{ a.created_at|date:"F d, Y" }} &bull; <i class="bi bi-eye"></i> {{ a.view_count }}</div>
+            <div class="small text-body-secondary mb-3">{{ a.content|striptags|truncatechars:120 }}</div>
+            <div class="mt-auto pt-2 border-top border-secondary border-opacity-10 text-gold fw-semibold small">
+              Read More <i class="bi bi-arrow-right"></i>
+            </div>
+          </div>
+        </div>
+      </a>
+    </div>
+  {% empty %}
+    <div class="col-12"><div class="alert alert-secondary">No announcements posted yet.</div></div>
+  {% endfor %}
+</div>
+<!-- No brightness-detection JS needed — the glass card is self-sufficient -->
+
+{% endblock %}

@@ -1,0 +1,1543 @@
+{% load static %}
+{% load auth_extras %}
+<!DOCTYPE html>
+<html lang="en" data-bs-theme="dark">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="description" content="LASU Electronic Venue Management System — book, manage and track hall reservations across Lagos State University." />
+  <title>{% block title %}LASU EVMS{% endblock %} — Electronic Venue Management</title>
+  <link rel="icon" type="image/png" href="{% static 'images/favicon.png' %}">
+
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+  <!-- Bootstrap 5.3 -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+
+  <!-- Legacy CSS -->
+  <link rel="stylesheet" href="{% static 'css/style.css' %}">
+
+  <style>
+    /* ============================================================
+       EVMS Design System — Premium Dark/Light Theme
+       ============================================================ */
+    :root {
+      --evms-gold: #C8A96A;
+      --evms-gold-light: #d4b87e;
+      --evms-blue: #1E3A5F;
+      --evms-blue-mid: #274b78;
+      --evms-blue-light: #3a6fa8;
+      --sidebar-width: 260px;
+      --sidebar-collapsed-width: 0px;
+      --topbar-height: 64px;
+      --radius-lg: 16px;
+      --radius-md: 10px;
+      --radius-sm: 6px;
+      --shadow-card: 0 1px 3px rgba(0,0,0,.12), 0 4px 16px rgba(0,0,0,.08);
+      --shadow-card-hover: 0 4px 12px rgba(0,0,0,.18), 0 12px 32px rgba(0,0,0,.14);
+      --transition-smooth: all 0.22s cubic-bezier(0.4,0,0.2,1);
+    }
+
+    /* Base */
+    *, *::before, *::after { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      font-family: 'Inter', system-ui, -apple-system, sans-serif;
+      background: #0F172A;
+      color: #E2E8F0;
+      min-height: 100vh;
+      font-size: 0.9rem;
+    }
+
+    /* ── Topbar ─────────────────────────────────────────────── */
+    .topbar {
+      position: fixed;
+      top: 0; left: 0; right: 0;
+      height: var(--topbar-height);
+      z-index: 1040;
+      background: rgba(15,23,42,0.92);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border-bottom: 1px solid rgba(255,255,255,0.08);
+      display: flex;
+      align-items: center;
+      padding: 0 1.25rem;
+      gap: 1rem;
+    }
+    .topbar .brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      text-decoration: none;
+      color: inherit;
+      min-width: 220px;
+    }
+    .topbar .brand-logo {
+      width: 38px; height: 38px;
+      object-fit: contain;
+      background: rgba(255,255,255,.92);
+      border-radius: 9px;
+      padding: 5px;
+    }
+    .topbar .brand-name {
+      font-weight: 700;
+      font-size: 1rem;
+      color: var(--evms-gold);
+      line-height: 1.1;
+    }
+    .topbar .brand-sub {
+      font-size: 0.65rem;
+      opacity: 0.6;
+      font-weight: 400;
+      line-height: 1;
+    }
+    .topbar-spacer { flex: 1; }
+    .topbar-actions {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    .topbar .sidebar-toggle {
+      display: none;
+      border: none;
+      background: transparent;
+      color: inherit;
+      font-size: 1.25rem;
+      cursor: pointer;
+      padding: 0.25rem 0.5rem;
+      border-radius: var(--radius-sm);
+    }
+    @media (max-width: 991px) {
+      .topbar .sidebar-toggle { display: block; }
+      .topbar .brand { min-width: auto; }
+    }
+    .topbar .notif-btn {
+      position: relative;
+      border: 1px solid rgba(255,255,255,0.15);
+      border-radius: var(--radius-sm);
+      padding: 0.35rem 0.6rem;
+      font-size: 1rem;
+      color: inherit;
+      background: transparent;
+      cursor: pointer;
+      transition: var(--transition-smooth);
+      text-decoration: none;
+    }
+    .topbar .notif-btn:hover {
+      background: rgba(200,169,106,0.12);
+      border-color: var(--evms-gold);
+      color: var(--evms-gold);
+    }
+    .notif-badge {
+      position: absolute;
+      top: -5px; right: -6px;
+      min-width: 18px; height: 18px;
+      background: #ef4444;
+      color: #fff;
+      font-size: 0.65rem;
+      font-weight: 700;
+      border-radius: 99px;
+      display: flex; align-items: center; justify-content: center;
+      padding: 0 4px;
+      border: 2px solid #0F172A;
+    }
+    .user-chip {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      border: 1px solid rgba(255,255,255,0.12);
+      border-radius: 99px;
+      padding: 4px 12px 4px 4px;
+      cursor: pointer;
+      transition: var(--transition-smooth);
+      text-decoration: none;
+      color: inherit;
+      font-size: 0.85rem;
+      font-weight: 500;
+    }
+    .user-chip:hover {
+      background: rgba(200,169,106,0.1);
+      border-color: var(--evms-gold);
+      color: var(--evms-gold);
+    }
+    .user-avatar {
+      width: 28px; height: 28px;
+      border-radius: 99px;
+      background: linear-gradient(135deg, var(--evms-blue), var(--evms-gold));
+      display: flex; align-items: center; justify-content: center;
+      font-weight: 700;
+      font-size: 0.75rem;
+      color: #fff;
+      flex-shrink: 0;
+    }
+    .theme-btn {
+      border: 1px solid rgba(255,255,255,0.12);
+      border-radius: var(--radius-sm);
+      background: transparent;
+      color: inherit;
+      padding: 0.35rem 0.55rem;
+      cursor: pointer;
+      transition: var(--transition-smooth);
+      font-size: 0.95rem;
+    }
+    .theme-btn:hover {
+      background: rgba(200,169,106,0.12);
+      border-color: var(--evms-gold);
+      color: var(--evms-gold);
+    }
+
+    /* ── Sidebar ─────────────────────────────────────────────── */
+    .app-sidebar {
+      position: fixed;
+      top: var(--topbar-height);
+      left: 0;
+      width: var(--sidebar-width);
+      height: calc(100vh - var(--topbar-height));
+      z-index: 1030;
+      background: #0D1425;
+      border-right: 1px solid rgba(255,255,255,0.06);
+      overflow-y: auto;
+      overflow-x: hidden;
+      transition: transform 0.28s cubic-bezier(0.4,0,0.2,1);
+      scrollbar-width: thin;
+      scrollbar-color: rgba(200,169,106,.3) transparent;
+    }
+    .app-sidebar::-webkit-scrollbar { width: 4px; }
+    .app-sidebar::-webkit-scrollbar-thumb { background: rgba(200,169,106,.3); border-radius: 4px; }
+
+    @media (max-width: 991px) {
+      .app-sidebar {
+        transform: translateX(-100%);
+        box-shadow: 4px 0 24px rgba(0,0,0,.4);
+      }
+      .app-sidebar.is-open {
+        transform: translateX(0);
+      }
+      .sidebar-backdrop {
+        display: none;
+        position: fixed;
+        inset: 0;
+        z-index: 1025;
+        background: rgba(0,0,0,.5);
+        backdrop-filter: blur(2px);
+      }
+      .sidebar-backdrop.is-open { display: block; }
+    }
+
+    /* Sidebar inner */
+    .sidebar-inner { padding: 1rem 0.75rem 2rem; }
+    .sidebar-section-label {
+      font-size: 0.65rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: rgba(148,163,184,0.5);
+      font-weight: 600;
+      padding: 1rem 0.75rem 0.25rem;
+      margin-top: 0.5rem;
+    }
+    .sidebar-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 0.45rem 0.75rem;
+      border-radius: var(--radius-md);
+      color: rgba(226,232,240,0.75);
+      font-size: 0.875rem;
+      font-weight: 500;
+      text-decoration: none;
+      transition: var(--transition-smooth);
+      cursor: pointer;
+      border: none;
+      background: none;
+      width: 100%;
+      text-align: left;
+      position: relative;
+    }
+    .sidebar-item:hover {
+      background: rgba(200,169,106,0.1);
+      color: var(--evms-gold);
+    }
+    .sidebar-item.active {
+      background: rgba(200,169,106,0.15);
+      color: var(--evms-gold);
+      font-weight: 600;
+    }
+    .sidebar-item.active::before {
+      content: '';
+      position: absolute;
+      left: -0.75rem;
+      top: 20%;
+      bottom: 20%;
+      width: 3px;
+      background: var(--evms-gold);
+      border-radius: 0 3px 3px 0;
+    }
+    .sidebar-item .si-icon {
+      font-size: 1.05rem;
+      width: 22px;
+      flex-shrink: 0;
+      text-align: center;
+    }
+    .sidebar-item .si-badge {
+      margin-left: auto;
+      background: #ef4444;
+      color: #fff;
+      font-size: 0.65rem;
+      font-weight: 700;
+      min-width: 18px; height: 18px;
+      border-radius: 99px;
+      display: flex; align-items: center; justify-content: center;
+      padding: 0 5px;
+    }
+    /* Accordion groups */
+    .sidebar-group {}
+    .sidebar-group-trigger {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 0.45rem 0.75rem;
+      border-radius: var(--radius-md);
+      color: rgba(226,232,240,0.75);
+      font-size: 0.875rem;
+      font-weight: 500;
+      cursor: pointer;
+      border: none;
+      background: none;
+      width: 100%;
+      text-align: left;
+      transition: var(--transition-smooth);
+    }
+    .sidebar-group-trigger:hover {
+      background: rgba(200,169,106,0.08);
+      color: var(--evms-gold);
+    }
+    .sidebar-group-trigger .sg-caret {
+      margin-left: auto;
+      transition: transform 0.22s ease;
+      font-size: 0.75rem;
+      opacity: 0.6;
+    }
+    .sidebar-group-trigger.is-open .sg-caret { transform: rotate(180deg); }
+    .sidebar-group-body {
+      display: none;
+      padding-left: 0.75rem;
+      border-left: 1.5px solid rgba(200,169,106,0.2);
+      margin-left: 1.4rem;
+      margin-top: 2px;
+      margin-bottom: 2px;
+    }
+    .sidebar-group-body.is-open { display: block; }
+    .sidebar-group-body .sidebar-item {
+      font-size: 0.82rem;
+      padding: 0.35rem 0.6rem;
+    }
+
+    /* ── Main Content Area ───────────────────────────────────── */
+    .main-content {
+      margin-left: var(--sidebar-width);
+      padding-top: calc(var(--topbar-height) + 1.5rem);
+      padding-bottom: 3rem;
+      min-height: 100vh;
+      transition: margin-left 0.28s cubic-bezier(0.4,0,0.2,1);
+    }
+    @media (max-width: 991px) {
+      .main-content { margin-left: 0; }
+    }
+    .content-wrapper { padding: 0 1.5rem; max-width: 1400px; margin: 0 auto; }
+    @media (min-width: 1600px) { .content-wrapper { padding: 0 2rem; } }
+
+    /* ── Cards ──────────────────────────────────────────────── */
+    .app-card {
+      background: #1E293B;
+      border: 1px solid rgba(255,255,255,0.07);
+      border-radius: var(--radius-lg);
+      box-shadow: var(--shadow-card);
+      transition: var(--transition-smooth);
+    }
+    .app-card:hover { box-shadow: var(--shadow-card-hover); }
+
+    /* Stat cards */
+    .stat-card {
+      background: #1E293B;
+      border: 1px solid rgba(255,255,255,0.07);
+      border-radius: var(--radius-lg);
+      padding: 1.5rem;
+      cursor: pointer;
+      transition: var(--transition-smooth);
+      text-decoration: none;
+      display: block;
+      position: relative;
+      overflow: hidden;
+    }
+    .stat-card:hover {
+      transform: translateY(-3px);
+      box-shadow: var(--shadow-card-hover);
+      border-color: rgba(200,169,106,0.3);
+    }
+    .stat-card .stat-icon {
+      width: 48px; height: 48px;
+      border-radius: 12px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 1.4rem;
+      margin-bottom: 1rem;
+    }
+    .stat-card .stat-value {
+      font-size: 2rem;
+      font-weight: 700;
+      color: #F8FAFC;
+      line-height: 1;
+      margin-bottom: 0.25rem;
+    }
+    .stat-card .stat-label {
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: rgba(148,163,184,0.8);
+      font-weight: 600;
+    }
+    .stat-card .stat-trend {
+      position: absolute;
+      top: 1rem; right: 1rem;
+      font-size: 0.75rem;
+      font-weight: 600;
+      padding: 2px 8px;
+      border-radius: 99px;
+    }
+
+    /* Status badges */
+    .status-pill {
+      font-size: 0.72rem;
+      font-weight: 600;
+      padding: 3px 10px;
+      border-radius: 99px;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+
+    /* Quick action buttons */
+    .quick-action {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 0.75rem 1rem;
+      border-radius: var(--radius-md);
+      border: 1px solid rgba(255,255,255,0.08);
+      background: transparent;
+      color: inherit;
+      text-decoration: none;
+      font-size: 0.875rem;
+      font-weight: 500;
+      transition: var(--transition-smooth);
+    }
+    .quick-action:hover {
+      background: rgba(200,169,106,0.1);
+      border-color: var(--evms-gold);
+      color: var(--evms-gold);
+      transform: translateX(2px);
+    }
+    .quick-action .qa-icon {
+      width: 32px; height: 32px;
+      border-radius: 8px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 1rem;
+      flex-shrink: 0;
+    }
+
+    /* ── KPI Cards ───────────────────────────────────────────── */
+    .kpi-card {
+      position: relative;
+      border-radius: var(--radius-lg);
+      padding: 1.25rem;
+      border: 1px solid rgba(255,255,255,0.07);
+      background: rgba(255,255,255,0.03);
+      transition: var(--transition-smooth);
+      overflow: hidden;
+      text-decoration: none;
+      display: block;
+      color: inherit;
+    }
+    .kpi-card::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      border-radius: var(--radius-lg);
+      background: linear-gradient(135deg, transparent 60%, rgba(200,169,106,0.04));
+      pointer-events: none;
+    }
+    .kpi-card:hover {
+      border-color: rgba(200,169,106,0.3);
+      transform: translateY(-2px);
+      box-shadow: 0 8px 24px rgba(0,0,0,0.2);
+      color: inherit;
+    }
+    .kpi-card .kpi-icon {
+      width: 42px; height: 42px;
+      border-radius: 10px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 1.15rem;
+      margin-bottom: 0.875rem;
+      flex-shrink: 0;
+    }
+    .kpi-card .kpi-value {
+      font-size: 1.9rem;
+      font-weight: 800;
+      line-height: 1;
+      margin-bottom: 0.2rem;
+      color: #F8FAFC;
+    }
+    .kpi-card .kpi-label {
+      font-size: 0.72rem;
+      text-transform: uppercase;
+      letter-spacing: 0.07em;
+      color: rgba(148,163,184,0.75);
+      font-weight: 600;
+      line-height: 1.3;
+    }
+    .kpi-card .kpi-trend {
+      position: absolute;
+      top: 1rem; right: 1rem;
+      font-size: 0.7rem;
+      font-weight: 700;
+      padding: 2px 8px;
+      border-radius: 99px;
+    }
+    .kpi-trend-up { background: rgba(34,197,94,.15); color: #22c55e; }
+    .kpi-trend-down { background: rgba(239,68,68,.15); color: #ef4444; }
+    .kpi-trend-neutral { background: rgba(148,163,184,.15); color: #94a3b8; }
+
+    /* ── Quick Action Tiles ──────────────────────────────────── */
+    .qa-tile {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 0.6rem;
+      padding: 1rem 0.75rem;
+      border-radius: var(--radius-md);
+      border: 1px solid rgba(255,255,255,0.08);
+      background: rgba(255,255,255,0.02);
+      color: inherit;
+      text-decoration: none;
+      font-size: 0.78rem;
+      font-weight: 600;
+      text-align: center;
+      transition: var(--transition-smooth);
+      cursor: pointer;
+      line-height: 1.3;
+    }
+    .qa-tile:hover {
+      background: rgba(200,169,106,0.1);
+      border-color: rgba(200,169,106,0.4);
+      color: var(--evms-gold);
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+    }
+    .qa-tile .qa-tile-icon {
+      width: 38px; height: 38px;
+      border-radius: 10px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 1.1rem;
+    }
+
+    /* ── Activity Panel / Feed ───────────────────────────────── */
+    .activity-feed { list-style: none; padding: 0; margin: 0; }
+    .activity-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 0.75rem;
+      padding: 0.65rem 0;
+      border-bottom: 1px solid rgba(255,255,255,0.06);
+    }
+    .activity-item:last-child { border-bottom: none; }
+    .activity-dot {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      margin-top: 0.35rem;
+      flex-shrink: 0;
+    }
+    .activity-meta { font-size: 0.72rem; color: rgba(148,163,184,0.6); margin-top: 1px; }
+    .activity-title { font-size: 0.82rem; font-weight: 500; line-height: 1.3; }
+
+    /* ── Section Header ──────────────────────────────────────── */
+    .section-hdr {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 1rem;
+      gap: 0.75rem;
+    }
+    .section-hdr-title {
+      font-size: 0.9rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: rgba(148,163,184,0.7);
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    .section-hdr-action {
+      font-size: 0.78rem;
+      color: var(--evms-gold);
+      text-decoration: none;
+      opacity: 0.8;
+      transition: opacity 0.15s;
+    }
+    .section-hdr-action:hover { opacity: 1; color: var(--evms-gold); }
+
+    /* ── Tab Navigation ──────────────────────────────────────── */
+    .evms-tabs {
+      display: flex;
+      gap: 0.25rem;
+      border-bottom: 1px solid rgba(255,255,255,0.08);
+      margin-bottom: 1.5rem;
+      overflow-x: auto;
+      scrollbar-width: none;
+      padding-bottom: 0;
+    }
+    .evms-tabs::-webkit-scrollbar { display: none; }
+    .evms-tab {
+      padding: 0.6rem 1.1rem;
+      font-size: 0.85rem;
+      font-weight: 500;
+      color: rgba(148,163,184,0.7);
+      border-bottom: 2px solid transparent;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: var(--transition-smooth);
+      border-radius: var(--radius-sm) var(--radius-sm) 0 0;
+      text-decoration: none;
+    }
+    .evms-tab:hover { color: rgba(226,232,240,0.9); }
+    .evms-tab.active {
+      color: var(--evms-gold);
+      border-bottom-color: var(--evms-gold);
+      font-weight: 600;
+    }
+    .evms-tab-content { display: none; }
+    .evms-tab-content.active { display: block; }
+
+    /* ── Status Badge Colours (all booking statuses) ─────────── */
+    .badge-status-submitted    { background: rgba(59,130,246,.2);  color: #60a5fa; }
+    .badge-status-under_review { background: rgba(234,179,8,.2);   color: #facc15; }
+    .badge-status-forwarded    { background: rgba(99,102,241,.2);  color: #818cf8; }
+    .badge-status-available    { background: rgba(34,197,94,.2);   color: #4ade80; }
+    .badge-status-approved_payment { background: rgba(16,185,129,.2); color: #34d399; }
+    .badge-status-payment_pending  { background: rgba(245,158,11,.2); color: #fbbf24; }
+    .badge-status-paid         { background: rgba(34,197,94,.2);   color: #4ade80; }
+    .badge-status-confirmed    { background: rgba(16,185,129,.2);  color: #34d399; }
+    .badge-status-completed    { background: rgba(148,163,184,.2); color: #94a3b8; }
+    .badge-status-inspection_pending { background: rgba(245,158,11,.2); color: #fbbf24; }
+    .badge-status-damage_reported    { background: rgba(239,68,68,.2); color: #f87171; }
+    .badge-status-closed       { background: rgba(107,114,128,.2); color: #9ca3af; }
+    .badge-status-rejected     { background: rgba(239,68,68,.2);   color: #f87171; }
+    .badge-status-cancelled    { background: rgba(239,68,68,.2);   color: #f87171; }
+
+    /* Generic status pill */
+    .status-pill {
+      font-size: 0.7rem;
+      font-weight: 600;
+      padding: 3px 9px;
+      border-radius: 99px;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      display: inline-block;
+    }
+
+    /* ── Empty State ─────────────────────────────────────────── */
+    .empty-state {
+      text-align: center;
+      padding: 3rem 1.5rem;
+    }
+    .empty-state .empty-icon {
+      font-size: 2.5rem;
+      margin-bottom: 1rem;
+      opacity: 0.35;
+    }
+    .empty-state h5 {
+      font-size: 1rem;
+      font-weight: 600;
+      margin-bottom: 0.4rem;
+      color: rgba(226,232,240,0.75);
+    }
+    .empty-state p {
+      font-size: 0.82rem;
+      color: rgba(148,163,184,0.6);
+      margin-bottom: 1.25rem;
+    }
+
+    /* ── btn-xs ──────────────────────────────────────────────── */
+    .btn-xs {
+      padding: 0.15rem 0.5rem;
+      font-size: 0.72rem;
+      border-radius: var(--radius-sm);
+      line-height: 1.5;
+    }
+
+    /* ── Dashboard workflow banner ───────────────────────────── */
+    .workflow-banner {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 0.3rem;
+      font-size: 0.78rem;
+      padding: 0.6rem 1rem;
+      border-radius: var(--radius-md);
+      background: rgba(255,255,255,0.04);
+      border: 1px solid rgba(255,255,255,0.07);
+      margin-bottom: 1.5rem;
+    }
+    .workflow-banner .wf-step { color: rgba(148,163,184,0.8); }
+    .workflow-banner .wf-arrow { color: rgba(148,163,184,0.35); }
+    .workflow-banner .wf-step.wf-active { color: var(--evms-gold); font-weight: 600; }
+
+    /* ── Misc Utilities ─────────────────────────────────────── */
+    .hover-lift {
+      transition: var(--transition-smooth);
+    }
+    .hover-lift:hover {
+      transform: translateY(-3px);
+      box-shadow: var(--shadow-card-hover);
+    }
+    .text-gold { color: var(--evms-gold) !important; }
+    .bg-gold { background: var(--evms-gold) !important; }
+    .border-gold { border-color: var(--evms-gold) !important; }
+
+    /* Alert messages */
+    .alert { border-radius: var(--radius-md); }
+
+    /* Toast container */
+    .toast-container {
+      position: fixed;
+      bottom: 1.5rem;
+      right: 1.5rem;
+      z-index: 9999;
+    }
+
+    /* Tables */
+    .table { font-size: 0.875rem; }
+    .table > thead { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; }
+    .table-hover > tbody > tr:hover td { background: rgba(200,169,106,0.05); }
+
+    /* Breadcrumb */
+    .breadcrumb { font-size: 0.8rem; }
+    .breadcrumb-item + .breadcrumb-item::before { color: rgba(148,163,184,0.5); }
+
+    /* Page header */
+    .page-header {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 1rem;
+      margin-bottom: 1.75rem;
+    }
+    .page-header h1 {
+      font-size: 1.5rem;
+      font-weight: 700;
+      color: #F8FAFC;
+      margin: 0 0 0.25rem;
+    }
+    .page-header .page-subtitle {
+      font-size: 0.875rem;
+      color: rgba(148,163,184,0.8);
+      margin: 0;
+    }
+
+    /* ── Footer ─────────────────────────────────────────────── */
+    .app-footer {
+      margin-left: var(--sidebar-width);
+      border-top: 1px solid rgba(255,255,255,0.06);
+      padding: 1rem 2rem;
+      font-size: 0.8rem;
+      color: rgba(148,163,184,0.6);
+    }
+    @media (max-width: 991px) { .app-footer { margin-left: 0; } }
+
+    /* Skeleton loading */
+    .skeleton {
+      border-radius: 6px;
+      background: rgba(148,163,184,.12);
+      position: relative;
+      overflow: hidden;
+    }
+    .skeleton::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      transform: translateX(-100%);
+      background: linear-gradient(90deg, transparent, rgba(255,255,255,.08), transparent);
+      animation: shimmer 1.4s infinite;
+    }
+    @keyframes shimmer { 100% { transform: translateX(100%); } }
+
+    /* Forms */
+    .form-control, .form-select {
+      border-radius: var(--radius-sm);
+    }
+    .form-control:focus, .form-select:focus {
+      border-color: var(--evms-gold);
+      box-shadow: 0 0 0 0.2rem rgba(200,169,106,.15);
+    }
+
+    /* Buttons */
+    .btn-primary {
+      --bs-btn-bg: var(--evms-blue);
+      --bs-btn-border-color: var(--evms-blue);
+      --bs-btn-hover-bg: var(--evms-blue-mid);
+      --bs-btn-hover-border-color: var(--evms-blue-mid);
+    }
+    .btn-gold {
+      background: var(--evms-gold);
+      border-color: var(--evms-gold);
+      color: #10213a;
+      font-weight: 600;
+    }
+    .btn-gold:hover {
+      background: var(--evms-gold-light);
+      border-color: var(--evms-gold-light);
+      color: #10213a;
+    }
+
+    /* ============================================================
+       PREMIUM LIGHT MODE UX REFINEMENT
+       ============================================================ */
+    [data-bs-theme="light"] {
+      /* Colors */
+      --evms-light-bg: #FAFAFA;
+      --evms-light-card: #FFFFFF;
+      --evms-light-text-primary: #111827;
+      --evms-light-text-secondary: #4B5563;
+      --evms-light-text-muted: #6B7280;
+      --evms-light-border: #E5E7EB;
+      --evms-light-border-hover: #D1D5DB;
+      --evms-light-shadow: 0 2px 4px rgba(0,0,0,0.04), 0 8px 16px rgba(0,0,0,0.03);
+      --evms-light-shadow-hover: 0 4px 12px rgba(0,0,0,0.08), 0 12px 24px rgba(0,0,0,0.06);
+    }
+
+    [data-bs-theme="light"] body {
+      background: var(--evms-light-bg);
+      color: var(--evms-light-text-primary);
+    }
+
+    /* ── Topbar & Sidebar ── */
+    [data-bs-theme="light"] .topbar {
+      background: rgba(255,255,255,0.95);
+      border-bottom: 1px solid var(--evms-light-border);
+      box-shadow: 0 1px 3px rgba(0,0,0,0.02);
+    }
+    [data-bs-theme="light"] .user-chip,
+    [data-bs-theme="light"] .notif-btn,
+    [data-bs-theme="light"] .theme-btn {
+      border-color: var(--evms-light-border);
+      color: var(--evms-light-text-primary);
+    }
+    [data-bs-theme="light"] .user-chip:hover,
+    [data-bs-theme="light"] .notif-btn:hover,
+    [data-bs-theme="light"] .theme-btn:hover {
+      background: #F3F4F6;
+      border-color: var(--evms-light-border-hover);
+      color: var(--evms-blue);
+    }
+    [data-bs-theme="light"] .notif-badge { border-color: #fff; box-shadow: 0 1px 2px rgba(0,0,0,0.1); }
+
+    [data-bs-theme="light"] .app-sidebar {
+      background: #F9FAFB;
+      border-right: 1px solid var(--evms-light-border);
+    }
+    [data-bs-theme="light"] .sidebar-section-label { color: var(--evms-light-text-muted); font-weight: 700; }
+    [data-bs-theme="light"] .sidebar-item,
+    [data-bs-theme="light"] .sidebar-group-trigger {
+      color: var(--evms-light-text-secondary);
+    }
+    [data-bs-theme="light"] .sidebar-item:hover,
+    [data-bs-theme="light"] .sidebar-group-trigger:hover {
+      background: #F3F4F6;
+      color: var(--evms-blue);
+    }
+    [data-bs-theme="light"] .sidebar-item.active {
+      background: #FFFFFF;
+      color: var(--evms-blue);
+      font-weight: 700;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+      border: 1px solid var(--evms-light-border);
+    }
+    [data-bs-theme="light"] .sidebar-item.active::before {
+      background: var(--evms-blue);
+    }
+
+    /* ── Typography & Headers ── */
+    [data-bs-theme="light"] .page-header h1,
+    [data-bs-theme="light"] h1, [data-bs-theme="light"] h2,
+    [data-bs-theme="light"] h3, [data-bs-theme="light"] h4,
+    [data-bs-theme="light"] h5, [data-bs-theme="light"] h6 {
+      color: var(--evms-light-text-primary);
+      font-weight: 700;
+    }
+    [data-bs-theme="light"] .page-header .page-subtitle,
+    [data-bs-theme="light"] .text-body-secondary {
+      color: var(--evms-light-text-secondary) !important;
+    }
+    [data-bs-theme="light"] .text-muted {
+      color: var(--evms-light-text-muted) !important;
+    }
+
+    /* ── Cards & Dashboard Widgets ── */
+    [data-bs-theme="light"] .app-card,
+    [data-bs-theme="light"] .stat-card {
+      background: var(--evms-light-card);
+      border: 1px solid var(--evms-light-border);
+      box-shadow: var(--evms-light-shadow);
+    }
+    [data-bs-theme="light"] .app-card:hover,
+    [data-bs-theme="light"] .stat-card:hover {
+      box-shadow: var(--evms-light-shadow-hover);
+      border-color: var(--evms-light-border-hover);
+    }
+    [data-bs-theme="light"] .stat-card .stat-value {
+      color: var(--evms-light-text-primary);
+    }
+    [data-bs-theme="light"] .stat-card .stat-label {
+      color: var(--evms-light-text-secondary);
+      font-weight: 700;
+    }
+
+    /* Quick Actions */
+    [data-bs-theme="light"] .quick-action {
+      background: var(--evms-light-card);
+      border: 1px solid var(--evms-light-border);
+      color: var(--evms-light-text-primary);
+      box-shadow: 0 1px 2px rgba(0,0,0,0.02);
+    }
+    [data-bs-theme="light"] .quick-action:hover {
+      background: #F9FAFB;
+      border-color: var(--evms-light-border-hover);
+      color: var(--evms-blue);
+      box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+    }
+
+    /* ── Tables ── */
+    [data-bs-theme="light"] .table {
+      color: var(--evms-light-text-primary);
+      border-color: var(--evms-light-border);
+    }
+    [data-bs-theme="light"] .table > thead {
+      background: #F9FAFB;
+    }
+    [data-bs-theme="light"] .table > thead > tr > th {
+      color: var(--evms-light-text-secondary);
+      border-bottom: 2px solid var(--evms-light-border);
+      font-weight: 600;
+    }
+    [data-bs-theme="light"] .table > tbody > tr > td {
+      border-bottom: 1px solid var(--evms-light-border);
+      vertical-align: middle;
+    }
+    [data-bs-theme="light"] .table-hover > tbody > tr:hover td {
+      background: #F9FAFB;
+    }
+
+    /* ── Forms ── */
+    [data-bs-theme="light"] .form-control,
+    [data-bs-theme="light"] .form-select {
+      background-color: #FFFFFF;
+      border: 1px solid var(--evms-light-border-hover);
+      color: var(--evms-light-text-primary);
+      box-shadow: 0 1px 2px rgba(0,0,0,0.02);
+    }
+    [data-bs-theme="light"] .form-control::placeholder {
+      color: var(--evms-light-text-muted);
+    }
+    [data-bs-theme="light"] .form-control:focus,
+    [data-bs-theme="light"] .form-select:focus {
+      border-color: var(--evms-blue);
+      box-shadow: 0 0 0 3px rgba(30,58,95,0.15);
+      background-color: #FFFFFF;
+    }
+    [data-bs-theme="light"] .form-label {
+      color: var(--evms-light-text-secondary);
+      font-weight: 600;
+    }
+
+    /* ── Buttons ── */
+    [data-bs-theme="light"] .btn-outline-secondary {
+      color: var(--evms-light-text-secondary);
+      border-color: var(--evms-light-border-hover);
+      background: #FFFFFF;
+    }
+    [data-bs-theme="light"] .btn-outline-secondary:hover {
+      color: var(--evms-light-text-primary);
+      background: #F3F4F6;
+      border-color: var(--evms-light-text-muted);
+    }
+    [data-bs-theme="light"] .btn-primary {
+      color: #FFFFFF;
+      background: var(--evms-blue);
+      border-color: var(--evms-blue);
+      box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+    }
+    [data-bs-theme="light"] .btn-primary:hover {
+      background: var(--evms-blue-mid);
+      border-color: var(--evms-blue-mid);
+      box-shadow: 0 4px 6px rgba(0,0,0,0.15);
+    }
+
+    /* ── Alerts & Footer ── */
+    [data-bs-theme="light"] .alert-secondary {
+      background: #F9FAFB;
+      border: 1px solid var(--evms-light-border);
+      color: var(--evms-light-text-secondary);
+    }
+    [data-bs-theme="light"] .app-footer {
+      border-top-color: var(--evms-light-border);
+      color: var(--evms-light-text-muted);
+    }
+
+    /* Specific adjustments for announcement cards etc */
+    [data-bs-theme="light"] .text-body {
+      color: var(--evms-light-text-primary) !important;
+    }
+    [data-bs-theme="light"] .border-secondary {
+      border-color: var(--evms-light-border) !important;
+    }
+
+    /* ── Light Mode: KPI Cards, Quick Actions, Activity Feed ── */
+    [data-bs-theme="light"] .kpi-card {
+      background: #FFFFFF;
+      border-color: var(--evms-light-border);
+      box-shadow: var(--evms-light-shadow);
+    }
+    [data-bs-theme="light"] .kpi-card:hover {
+      border-color: var(--evms-blue-light);
+      box-shadow: var(--evms-light-shadow-hover);
+    }
+    [data-bs-theme="light"] .kpi-card .kpi-value { color: var(--evms-light-text-primary); }
+    [data-bs-theme="light"] .kpi-card .kpi-label { color: var(--evms-light-text-muted); }
+    [data-bs-theme="light"] .qa-tile {
+      background: #FFFFFF;
+      border-color: var(--evms-light-border);
+      color: var(--evms-light-text-secondary);
+      box-shadow: var(--evms-light-shadow);
+    }
+    [data-bs-theme="light"] .qa-tile:hover {
+      background: #F3F8FF;
+      border-color: var(--evms-blue-light);
+      color: var(--evms-blue);
+      box-shadow: var(--evms-light-shadow-hover);
+    }
+    [data-bs-theme="light"] .activity-item { border-bottom-color: var(--evms-light-border); }
+    [data-bs-theme="light"] .activity-title { color: var(--evms-light-text-primary); }
+    [data-bs-theme="light"] .activity-meta { color: var(--evms-light-text-muted); }
+    [data-bs-theme="light"] .section-hdr-title { color: var(--evms-light-text-muted); }
+    [data-bs-theme="light"] .evms-tabs { border-bottom-color: var(--evms-light-border); }
+    [data-bs-theme="light"] .evms-tab { color: var(--evms-light-text-muted); }
+    [data-bs-theme="light"] .evms-tab:hover { color: var(--evms-light-text-secondary); }
+    [data-bs-theme="light"] .evms-tab.active { color: var(--evms-blue); border-bottom-color: var(--evms-blue); }
+    [data-bs-theme="light"] .workflow-banner {
+      background: #F9FAFB;
+      border-color: var(--evms-light-border);
+    }
+    [data-bs-theme="light"] .empty-state h5 { color: var(--evms-light-text-primary); }
+    [data-bs-theme="light"] .empty-state p { color: var(--evms-light-text-muted); }
+  </style>
+
+  <!-- Early theme init to prevent flash -->
+  <script>
+    (function() {
+      const saved = localStorage.getItem("evms_theme") || "dark";
+      document.documentElement.setAttribute("data-bs-theme", saved);
+    })();
+  </script>
+  {% block extra_head %}{% endblock %}
+</head>
+<body>
+
+<!-- Sidebar backdrop (mobile) -->
+<div class="sidebar-backdrop" id="sidebarBackdrop"></div>
+
+<!-- ── Topbar ──────────────────────────────────────────────────── -->
+<header class="topbar">
+  <button class="sidebar-toggle" id="sidebarToggle" aria-label="Toggle sidebar">
+    <i class="bi bi-list"></i>
+  </button>
+
+  <a class="brand" href="{% url 'hall:home' %}">
+    <img class="brand-logo" src="{% static 'images/lasu_logo.png' %}" alt="LASU">
+    <div>
+      <div class="brand-name">LASU EVMS</div>
+      <div class="brand-sub">Electronic Venue Management</div>
+    </div>
+  </a>
+
+  <div class="topbar-spacer"></div>
+
+  <div class="topbar-actions">
+    <button class="theme-btn" id="themeToggle" title="Toggle theme">
+      <i class="bi bi-circle-half"></i>
+    </button>
+
+    {% if request.user.is_authenticated %}
+      <a class="notif-btn" href="{% url 'notifications:inbox' %}" title="Notifications">
+        <i class="bi bi-bell"></i>
+        {% if unread_notifications_count %}
+          <span class="notif-badge">{{ unread_notifications_count }}</span>
+        {% endif %}
+      </a>
+
+      <a class="user-chip" href="{% url 'users:profile' %}">
+        <div class="user-avatar">{{ request.user.first_name|first|upper }}{{ request.user.last_name|first|upper }}{% if not request.user.first_name %}{{ request.user.username|first|upper }}{% endif %}</div>
+        <span class="d-none d-sm-inline">{{ request.user.get_full_name|default:request.user.username }}</span>
+        <small class="d-none d-md-inline opacity-50">{{ request.user.role }}</small>
+      </a>
+    {% else %}
+      <a class="btn btn-sm btn-outline-secondary me-1" href="{% url 'users:login' %}">Login</a>
+      <a class="btn btn-sm btn-gold" href="{% url 'users:register' %}">Sign up</a>
+    {% endif %}
+  </div>
+</header>
+
+<!-- ── Sidebar ─────────────────────────────────────────────────── -->
+<nav class="app-sidebar" id="appSidebar" aria-label="Main navigation">
+  <div class="sidebar-inner">
+
+    <!-- Public links -->
+    <div class="sidebar-section-label">Explore</div>
+    <a class="sidebar-item {% block nav_home %}{% endblock %}" href="{% url 'hall:home' %}">
+      <i class="bi bi-house si-icon"></i> Home
+    </a>
+    <a class="sidebar-item {% block nav_halls %}{% endblock %}" href="{% url 'hall:hall_list' %}">
+      <i class="bi bi-building si-icon"></i> Browse Halls
+    </a>
+    <a class="sidebar-item" href="{% url 'hall:announcements' %}">
+      <i class="bi bi-megaphone si-icon"></i> Announcements
+    </a>
+    <a class="sidebar-item" href="{% url 'hall:faq' %}">
+      <i class="bi bi-question-circle si-icon"></i> FAQ
+    </a>
+    <a class="sidebar-item" href="{% url 'hall:contact' %}">
+      <i class="bi bi-envelope si-icon"></i> Contact Us
+    </a>
+
+    {% if request.user.is_authenticated %}
+
+    <!-- My Account — shown to all authenticated users (Bursary gets condensed version) -->
+    <div class="sidebar-section-label">My Account</div>
+    <a class="sidebar-item {% block nav_dashboard %}{% endblock %}" href="{% url 'hall:dashboard' %}">
+      <i class="bi bi-speedometer2 si-icon"></i> Dashboard
+    </a>
+    {% if request.user.role != 'BURSARY' %}
+    <a class="sidebar-item {% block nav_reservations %}{% endblock %}" href="{% url 'reservations:my_reservations' %}">
+      <i class="bi bi-calendar-check si-icon"></i> My Reservations
+    </a>
+    <a class="sidebar-item" href="{% url 'reservations:calendar' %}">
+      <i class="bi bi-calendar3 si-icon"></i> Calendar
+    </a>
+    <a class="sidebar-item" href="{% url 'hall:bookmarks' %}">
+      <i class="bi bi-bookmarks si-icon"></i> Bookmarks
+    </a>
+    <a class="sidebar-item" href="{% url 'payments:my_payments' %}">
+      <i class="bi bi-credit-card si-icon"></i> My Payments
+    </a>
+    <a class="sidebar-item" href="{% url 'notifications:inbox' %}">
+      <i class="bi bi-bell si-icon"></i> Notifications
+      {% if unread_notifications_count %}
+        <span class="si-badge">{{ unread_notifications_count }}</span>
+      {% endif %}
+    </a>
+    {% endif %}
+
+    <!-- Ventures Desk -->
+    {% if request.user|has_capability:"ventures_workflow" %}
+    <div class="sidebar-section-label">Ventures</div>
+    <a class="sidebar-item {% block nav_ventures %}{% endblock %}" href="{% url 'reservations:ventures_dashboard' %}">
+      <i class="bi bi-diagram-3 si-icon"></i> Ventures Dashboard
+    </a>
+    <a class="sidebar-item" href="{% url 'reservations:my_reservations' %}?mode=master">
+      <i class="bi bi-inbox si-icon"></i> All Reservations
+    </a>
+
+    <!-- Finance group (Ventures only) -->
+    {% if request.user|has_capability:"manage_payments" %}
+    <div class="sidebar-group" id="sgFinance">
+      <button class="sidebar-group-trigger" data-target="sgFinanceBody">
+        <i class="bi bi-cash-stack si-icon"></i> Finance
+        <i class="bi bi-chevron-down sg-caret"></i>
+      </button>
+      <div class="sidebar-group-body" id="sgFinanceBody">
+        <a class="sidebar-item" href="{% url 'payments:my_payments' %}">
+          <i class="bi bi-receipt si-icon"></i> Payments
+        </a>
+        <a class="sidebar-item" href="{% url 'payments:coupon_list' %}">
+          <i class="bi bi-ticket-perforated si-icon"></i> Coupons
+        </a>
+        <a class="sidebar-item" href="{% url 'reservations:penalty_list' %}">
+          <i class="bi bi-exclamation-octagon si-icon"></i> Penalties
+        </a>
+        <a class="sidebar-item" href="{% url 'reports:dashboard' %}">
+          <i class="bi bi-graph-up-arrow si-icon"></i> Financial Reports
+        </a>
+      </div>
+    </div>
+    {% endif %}
+
+    {% if request.user|has_capability:"manage_communications" %}
+    <a class="sidebar-item" href="{% url 'hall:communications_dashboard' %}">
+      <i class="bi bi-broadcast si-icon"></i> Communications
+    </a>
+    {% endif %}
+    {% endif %}
+
+    <!-- Facility Desk -->
+    {% if request.user|has_capability:"facility_workflow" %}
+    <div class="sidebar-section-label">Facility</div>
+    <a class="sidebar-item {% block nav_facility %}{% endblock %}" href="{% url 'reservations:facility_dashboard' %}">
+      <i class="bi bi-tools si-icon"></i> Facility Dashboard
+    </a>
+
+    <!-- Hall Management group -->
+    {% if request.user|has_capability:"manage_halls" %}
+    <div class="sidebar-group" id="sgHalls">
+      <button class="sidebar-group-trigger" data-target="sgHallsBody">
+        <i class="bi bi-building-gear si-icon"></i> Hall Management
+        <i class="bi bi-chevron-down sg-caret"></i>
+      </button>
+      <div class="sidebar-group-body" id="sgHallsBody">
+        <a class="sidebar-item" href="{% url 'hall:hall_manage' %}">
+          <i class="bi bi-list-ul si-icon"></i> All Halls
+        </a>
+        <a class="sidebar-item" href="{% url 'hall:hall_create' %}">
+          <i class="bi bi-plus-circle si-icon"></i> Add Hall
+        </a>
+        <a class="sidebar-item" href="{% url 'hall:amenity_manage' %}">
+          <i class="bi bi-check2-square si-icon"></i> Amenities
+        </a>
+      </div>
+    </div>
+    {% endif %}
+
+    {% if request.user|has_capability:"manage_internal_reservations" %}
+    <a class="sidebar-item" href="{% url 'reservations:internal_list' %}">
+      <i class="bi bi-building-check si-icon"></i> Internal Reservations
+    </a>
+    {% endif %}
+    {% endif %}
+
+    <!-- Reports -->
+    {% if request.user|has_capability:"view_reports" %}
+    <div class="sidebar-section-label">Analytics</div>
+    <a class="sidebar-item {% block nav_reports %}{% endblock %}" href="{% url 'reports:dashboard' %}">
+      <i class="bi bi-graph-up-arrow si-icon"></i> Dashboard
+    </a>
+    <a class="sidebar-item" href="{% url 'reports:report_centre' %}">
+      <i class="bi bi-journal-text si-icon"></i> Report Centre
+    </a>
+    {% endif %}
+
+    <!-- Admin -->
+    {% if request.user.role == 'ADMIN' or request.user.is_superuser %}
+    <div class="sidebar-section-label">Administration</div>
+    <a class="sidebar-item {% block nav_admin %}{% endblock %}" href="{% url 'reservations:admin_dashboard' %}">
+      <i class="bi bi-shield-lock si-icon"></i> Admin Dashboard
+    </a>
+    <div class="sidebar-group" id="sgAdmin">
+      <button class="sidebar-group-trigger" data-target="sgAdminBody">
+        <i class="bi bi-gear si-icon"></i> System
+        <i class="bi bi-chevron-down sg-caret"></i>
+      </button>
+      <div class="sidebar-group-body" id="sgAdminBody">
+        <a class="sidebar-item" href="{% url 'users:admin_user_list' %}">
+          <i class="bi bi-people si-icon"></i> User Directory
+        </a>
+        <a class="sidebar-item" href="{% url 'admin_system_logs' %}">
+          <i class="bi bi-terminal si-icon"></i> System Logs
+        </a>
+        <a class="sidebar-item" href="{% url 'admin:index' %}">
+          <i class="bi bi-sliders si-icon"></i> Django Admin
+        </a>
+        <a class="sidebar-item" href="{% url 'hall:communications_dashboard' %}">
+          <i class="bi bi-broadcast si-icon"></i> Communications
+        </a>
+      </div>
+    </div>
+    {% endif %}
+
+    <!-- Department specific -->
+    {% if request.user.role == 'DEPARTMENT' %}
+    <div class="sidebar-section-label">Department</div>
+    <a class="sidebar-item" href="{% url 'hall:department_dashboard' %}">
+      <i class="bi bi-building si-icon"></i> Department Desk
+    </a>
+    {% endif %}
+
+    <!-- Bursary Desk — dedicated management sidebar -->
+    {% if request.user|has_capability:"bursary_workflow" %}
+    <div class="sidebar-section-label">Bursary</div>
+    <a class="sidebar-item {% block nav_bursary %}{% endblock %}" href="{% url 'reservations:bursary_dashboard' %}">
+      <i class="bi bi-shield-check si-icon"></i> Dashboard
+    </a>
+
+    <!-- Payment Verification group -->
+    <div class="sidebar-group" id="sgBursaryPayments">
+      <button class="sidebar-group-trigger" data-target="sgBursaryPaymentsBody">
+        <i class="bi bi-cash-coin si-icon"></i> Payment Verification
+        <i class="bi bi-chevron-down sg-caret"></i>
+      </button>
+      <div class="sidebar-group-body" id="sgBursaryPaymentsBody">
+        <a class="sidebar-item" href="{% url 'reservations:bursary_dashboard' %}#payment-queue">
+          <i class="bi bi-inbox-fill si-icon"></i> Payment Queue
+        </a>
+        <a class="sidebar-item" href="{% url 'reservations:bursary_dashboard' %}#damage-queue">
+          <i class="bi bi-exclamation-diamond si-icon"></i> Damage Payment Queue
+        </a>
+      </div>
+    </div>
+
+    <!-- Booking Cases -->
+    <a class="sidebar-item" href="{% url 'reservations:my_reservations' %}?mode=personal">
+      <i class="bi bi-folder2-open si-icon"></i> Booking Cases
+    </a>
+
+    <!-- Communication Center -->
+    <a class="sidebar-item" href="{% url 'notifications:inbox' %}">
+      <i class="bi bi-chat-dots si-icon"></i> Communication Center
+    </a>
+
+    <!-- Reports -->
+    <a class="sidebar-item {% block nav_bursary_reports %}{% endblock %}" href="{% url 'reports:dashboard' %}">
+      <i class="bi bi-graph-up-arrow si-icon"></i> Reports
+    </a>
+
+    <!-- Audit Logs -->
+    <a class="sidebar-item" href="{% url 'reservations:bursary_audit_logs' %}">
+      <i class="bi bi-journal-text si-icon"></i> Audit Logs
+    </a>
+
+    <!-- Notifications -->
+    <a class="sidebar-item" href="{% url 'notifications:inbox' %}">
+      <i class="bi bi-bell si-icon"></i> Notifications
+      {% if unread_notifications_count %}
+        <span class="si-badge">{{ unread_notifications_count }}</span>
+      {% endif %}
+    </a>
+
+    <!-- Profile -->
+    <a class="sidebar-item" href="{% url 'users:profile' %}">
+      <i class="bi bi-person-circle si-icon"></i> Profile
+    </a>
+    {% endif %}
+
+    <!-- Separator + Logout -->
+    <div class="mt-3 pt-3" style="border-top: 1px solid rgba(255,255,255,0.06);">
+      <a class="sidebar-item text-danger" href="{% url 'users:logout' %}">
+        <i class="bi bi-box-arrow-right si-icon"></i> Sign Out
+      </a>
+    </div>
+
+    {% else %}
+    <!-- Not authenticated -->
+    <div class="sidebar-section-label">Account</div>
+    <a class="sidebar-item" href="{% url 'users:login' %}">
+      <i class="bi bi-box-arrow-in-right si-icon"></i> Login
+    </a>
+    <a class="sidebar-item" href="{% url 'users:register' %}">
+      <i class="bi bi-person-plus si-icon"></i> Register
+    </a>
+    {% endif %}
+
+  </div>
+</nav>
+
+<!-- ── Main Content ─────────────────────────────────────────────── -->
+<main class="main-content" id="mainContent">
+  <div class="content-wrapper">
+
+    <!-- Alert messages (auto-toast style) -->
+    {% if messages %}
+      <div class="mb-3" id="alert-container">
+        {% for message in messages %}
+          <div class="alert alert-{% if message.tags == 'error' %}danger{% else %}{{ message.tags|default:'info' }}{% endif %} alert-dismissible fade show d-flex align-items-center gap-2" role="alert">
+            {% if message.tags == 'success' %}<i class="bi bi-check-circle-fill"></i>
+            {% elif message.tags == 'error' or message.tags == 'danger' %}<i class="bi bi-exclamation-circle-fill"></i>
+            {% elif message.tags == 'warning' %}<i class="bi bi-exclamation-triangle-fill"></i>
+            {% else %}<i class="bi bi-info-circle-fill"></i>{% endif %}
+            <span>{{ message }}</span>
+            <button type="button" class="btn-close ms-auto" data-bs-dismiss="alert" aria-label="Close"></button>
+          </div>
+        {% endfor %}
+      </div>
+    {% endif %}
+
+    {% block content %}{% endblock %}
+  </div>
+</main>
+
+<!-- ── Footer ──────────────────────────────────────────────────── -->
+<footer class="app-footer d-flex flex-wrap justify-content-between align-items-center gap-2">
+  <div>© {% now "Y" %} Lagos State University — Electronic Venue Management System</div>
+  <div class="d-flex gap-3">
+    <a href="{% url 'hall:faq' %}" class="text-body-secondary text-decoration-none small">FAQ</a>
+    <a href="{% url 'hall:contact' %}" class="text-body-secondary text-decoration-none small">Contact</a>
+    <a href="{% url 'hall:announcements' %}" class="text-body-secondary text-decoration-none small">News</a>
+  </div>
+</footer>
+
+<!-- Bootstrap JS -->
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+
+<!-- CKEditor 5 -->
+<script src="https://cdn.ckeditor.com/ckeditor5/39.0.1/classic/ckeditor.js"></script>
+<style>
+  /* ── CKEditor branding suppression ─────────────────────── */
+  .ck.ck-powered-by,
+  .ck-powered-by,
+  a[href*="ckeditor.com"][target="_blank"] { display: none !important; }
+  .ck.ck-editor { border-radius: var(--radius-md) !important; }
+  .ck.ck-toolbar { border-radius: var(--radius-md) var(--radius-md) 0 0 !important; }
+  .ck.ck-content { min-height: 140px; }
+</style>
+
+<script>
+(function() {
+  'use strict';
+
+  // ── Theme Toggle ────────────────────────────────────────────────
+  const KEY = 'evms_theme';
+  const themeBtn = document.getElementById('themeToggle');
+  if (themeBtn) {
+    themeBtn.addEventListener('click', function () {
+      const current = document.documentElement.getAttribute('data-bs-theme') || 'dark';
+      const next = current === 'dark' ? 'light' : 'dark';
+      document.documentElement.setAttribute('data-bs-theme', next);
+      localStorage.setItem(KEY, next);
+    });
+  }
+
+  // ── Sidebar Accordion Groups ────────────────────────────────────
+  document.querySelectorAll('.sidebar-group-trigger').forEach(function(btn) {
+    const targetId = btn.dataset.target;
+    const body = document.getElementById(targetId);
+    if (!body) return;
+
+    // Auto-open group if a child is active
+    if (body.querySelector('.sidebar-item.active')) {
+      btn.classList.add('is-open');
+      body.classList.add('is-open');
+    }
+
+    btn.addEventListener('click', function() {
+      const isOpen = body.classList.contains('is-open');
+      // Close all other groups
+      document.querySelectorAll('.sidebar-group-body.is-open').forEach(function(b) {
+        if (b !== body) {
+          b.classList.remove('is-open');
+          b.previousElementSibling && b.previousElementSibling.classList.remove('is-open');
+        }
+      });
+      body.classList.toggle('is-open', !isOpen);
+      btn.classList.toggle('is-open', !isOpen);
+    });
+  });
+
+  // ── Mobile Sidebar Toggle ───────────────────────────────────────
+  const sidebar = document.getElementById('appSidebar');
+  const backdrop = document.getElementById('sidebarBackdrop');
+  const toggleBtn = document.getElementById('sidebarToggle');
+
+  function openSidebar() {
+    sidebar && sidebar.classList.add('is-open');
+    backdrop && backdrop.classList.add('is-open');
+    document.body.style.overflow = 'hidden';
+  }
+  function closeSidebar() {
+    sidebar && sidebar.classList.remove('is-open');
+    backdrop && backdrop.classList.remove('is-open');
+    document.body.style.overflow = '';
+  }
+
+  if (toggleBtn) toggleBtn.addEventListener('click', openSidebar);
+  if (backdrop) backdrop.addEventListener('click', closeSidebar);
+
+  // Close sidebar on nav link click (mobile)
+  document.querySelectorAll('.app-sidebar .sidebar-item').forEach(function(link) {
+    link.addEventListener('click', function() {
+      if (window.innerWidth < 992) closeSidebar();
+    });
+  });
+
+  // ── Active Sidebar Item ─────────────────────────────────────────
+  const currentPath = window.location.pathname;
+  document.querySelectorAll('.app-sidebar .sidebar-item[href]').forEach(function(link) {
+    const href = link.getAttribute('href');
+    if (href && href !== '/' && currentPath.startsWith(href)) {
+      link.classList.add('active');
+      // Open parent group if inside one
+      const groupBody = link.closest('.sidebar-group-body');
+      if (groupBody) {
+        groupBody.classList.add('is-open');
+        const trigger = groupBody.previousElementSibling;
+        if (trigger) trigger.classList.add('is-open');
+      }
+    }
+  });
+
+  // ── CKEditor for rich text (branding suppressed) ─────────────────
+  window._ckEditors = [];
+  document.querySelectorAll('textarea.rich-editor').forEach(function(el) {
+    // Create a hidden input to carry CKEditor data through form submission
+    var hiddenInput = document.createElement('input');
+    hiddenInput.type = 'hidden';
+    hiddenInput.name = el.name + '_data';
+    el.parentNode.insertBefore(hiddenInput, el.nextSibling);
+
+    ClassicEditor.create(el, {
+      licenseKey: 'GPL',
+      toolbar: {
+        items: ['heading', '|', 'bold', 'italic', 'underline', '|', 'link',
+                'bulletedList', 'numberedList', '|', 'blockQuote', 'insertTable',
+                '|', 'undo', 'redo'],
+        shouldNotGroupWhenFull: true
+      },
+      removePlugins: ['CKEditorInspector']
+    }).then(function(editor) {
+      window._ckEditors.push({ editor: editor, hidden: hiddenInput });
+      // Sync on every change
+      editor.model.document.on('change:data', function() {
+        hiddenInput.value = editor.getData();
+        el.value = editor.getData();
+      });
+      // Ensure branding element is hidden after mount
+      var poweredBy = document.querySelector('.ck-powered-by, .ck.ck-powered-by');
+      if (poweredBy) poweredBy.style.display = 'none';
+    }).catch(console.error);
+  });
+
+  // Sync all CKEditor instances before any form submit
+  document.querySelectorAll('form').forEach(function(form) {
+    form.addEventListener('submit', function() {
+      (window._ckEditors || []).forEach(function(entry) {
+        entry.hidden.value = entry.editor.getData();
+        // Also update the original textarea value as a fallback
+        if (entry.editor.sourceElement) {
+          entry.editor.sourceElement.value = entry.editor.getData();
+        }
+      });
+    });
+  });
+
+  // ── Auto-dismiss alerts after 6s ───────────────────────────────
+  setTimeout(function() {
+    document.querySelectorAll('#alert-container .alert').forEach(function(el) {
+      const bsAlert = bootstrap.Alert.getOrCreateInstance(el);
+      bsAlert.close();
+    });
+  }, 6000);
+
+})();
+</script>
+
+{% block extra_js %}{% endblock %}
+</body>
+</html>

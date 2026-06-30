@@ -1,0 +1,55 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+
+# Virtual environment
+venv/
+env/
+ENV/
+.venv/
+
+# Django
+db.sqlite3
+media/
+staticfiles/
+*.log
+
+# Sensitive files
+.env
+.env.local
+
+# IDE / Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# OS files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Temporary files
+*.tmp
+*.bak
+*.cache
+
+# Frontend templates (if not part of Django)
+Frontend Template/
+z-HMS-Template/
+
+# Documentation (if not needed in repo)
+*.pdf
+cookies.txt
+License.txt.txt

@@ -1,0 +1,95 @@
+{% extends "hall/base.html" %}
+{% load static %}
+{% block content %}
+  <div class="row g-3">
+    <div class="col-lg-7">
+      <div class="card app-card">
+        <div class="card-body p-4">
+          <div class="d-flex flex-wrap align-items-center gap-3 mb-3">
+            <img src="{% if u.profile_image %}{{ u.profile_image.url }}{% else %}{% static 'images/lasu_logo.png' %}{% endif %}" alt="Profile" style="width:56px;height:56px;object-fit:cover;border-radius:999px;">
+            <div>
+              <h1 class="h4 mb-1">My profile</h1>
+              <div class="text-body-secondary">Account details used for hall bookings</div>
+            </div>
+          </div>
+
+          <div class="row g-3">
+            <div class="col-md-6">
+              <div class="text-body-secondary small">Username</div>
+              <div class="fw-semibold">{{ u.username }}</div>
+            </div>
+            <div class="col-md-6">
+              <div class="text-body-secondary small">Email</div>
+              <div class="fw-semibold">{{ u.email }}</div>
+            </div>
+            <div class="col-md-6">
+              <div class="text-body-secondary small">Name</div>
+              <div class="fw-semibold">{{ u.first_name }} {{ u.last_name }}</div>
+            </div>
+            <div class="col-md-6">
+              <div class="text-body-secondary small">Phone</div>
+              <div class="fw-semibold">{{ u.phone_number|default:"-" }}</div>
+            </div>
+            <div class="col-md-6">
+              <div class="text-body-secondary small">Role</div>
+              <div><span class="badge text-bg-success">{{ u.get_role_display|default:u.role }}</span></div>
+            </div>
+            <div class="col-md-6">
+              <div class="text-body-secondary small">Department</div>
+              <div class="fw-semibold">{{ u.department|default:"-" }}</div>
+            </div>
+            <div class="col-md-6">
+              <div class="text-body-secondary small">Date joined</div>
+              <div class="fw-semibold">{{ u.date_joined }}</div>
+            </div>
+            <div class="col-12">
+              <div class="d-flex flex-wrap gap-2">
+                <span class="badge {% if u.is_verified %}text-bg-success{% else %}text-bg-warning{% endif %}">
+                  Verified: {{ u.is_verified }}
+                </span>
+                <span class="badge {% if u.is_blocked %}text-bg-danger{% else %}text-bg-secondary{% endif %}">
+                  Blocked: {{ u.is_blocked }}
+                </span>
+              </div>
+              {% if u.is_blocked %}
+                <div class="alert alert-warning mt-3 mb-0">
+                  Your account may be blocked due to unpaid damages/penalties. Clear them in admin or pay via Payments.
+                </div>
+              {% endif %}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="col-lg-5">
+      <div class="card app-card mb-3">
+        <div class="card-body p-4">
+          <h2 class="h6">Edit Profile</h2>
+          <form method="post" enctype="multipart/form-data" class="vstack gap-2">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="profile">
+            <input class="form-control" name="first_name" placeholder="First name" value="{{ u.first_name }}">
+            <input class="form-control" name="last_name" placeholder="Last name" value="{{ u.last_name }}">
+            <input class="form-control" name="phone_number" placeholder="Phone number" value="{{ u.phone_number }}">
+            <input class="form-control" name="department" placeholder="Department" value="{{ u.department }}">
+            <label class="form-label small">Profile image</label>
+            <input class="form-control" type="file" name="profile_image" accept="image/*">
+            <button class="btn btn-success mt-2" type="submit">Save Profile</button>
+          </form>
+        </div>
+      </div>
+      <div class="card app-card">
+        <div class="card-body p-4">
+          <h2 class="h6">Change Password</h2>
+          <form method="post" class="vstack gap-2">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="password">
+            {{ password_form.as_p }}
+            <button class="btn btn-outline-secondary" type="submit">Update Password</button>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+{% endblock %}
+

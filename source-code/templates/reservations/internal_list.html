@@ -1,0 +1,91 @@
+{% extends "hall/base.html" %}
+{% load auth_extras %}
+{% block title %}Internal Reservations{% endblock %}
+{% block nav_facility %}active{% endblock %}
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1><i class="bi bi-building-check text-primary me-2"></i>Internal Reservations</h1>
+    <p class="page-subtitle">Manage internal university bookings that block halls without payment</p>
+  </div>
+  <div class="d-flex gap-2">
+    <a href="{% url 'reservations:internal_create' %}" class="btn btn-gold hover-lift"><i class="bi bi-plus-circle me-1"></i>New Internal Booking</a>
+  </div>
+</div>
+
+<div class="card app-card border-0 shadow-sm">
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table class="table table-hover align-middle mb-0">
+        <thead class="table-light">
+          <tr>
+            <th class="ps-4">Reference</th>
+            <th>Department</th>
+            <th>Event / Purpose</th>
+            <th>Hall</th>
+            <th>Date & Time</th>
+            <th>Status</th>
+            <th class="text-end pe-4">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for r in reservations %}
+          <tr>
+            <td class="ps-4 font-monospace small"><a href="{% url 'reservations:internal_edit' r.reference %}" class="text-decoration-none">{{ r.reference }}</a></td>
+            <td class="fw-medium">{{ r.requesting_department }}</td>
+            <td>
+              <div class="text-body">{{ r.event_name|truncatechars:30 }}</div>
+              <div class="text-muted small">{{ r.get_purpose_display }}</div>
+            </td>
+            <td>{{ r.hall.name }}</td>
+            <td class="small text-muted">
+              {{ r.booking_date|date:"M d, Y" }}<br>
+              {{ r.start_time|time:"H:i" }} - {{ r.end_time|time:"H:i" }}
+            </td>
+            <td>
+              {% if r.status == "SUBMITTED" %}
+                <span class="badge bg-warning text-dark border px-2">Submitted</span>
+              {% elif r.status == "APPROVED" %}
+                <span class="badge bg-success bg-opacity-10 text-success border border-success-subtle px-2">Approved</span>
+              {% elif r.status == "REJECTED" %}
+                <span class="badge bg-danger bg-opacity-10 text-danger border border-danger-subtle px-2">Rejected</span>
+              {% elif r.status == "CANCELLED" %}
+                <span class="badge bg-secondary bg-opacity-10 text-secondary border border-secondary-subtle px-2">Cancelled</span>
+              {% endif %}
+            </td>
+            <td class="text-end pe-4">
+              <a href="{% url 'reservations:internal_edit' r.reference %}" class="btn btn-sm btn-outline-secondary" title="Edit"><i class="bi bi-pencil"></i></a>
+              {% if r.status == "SUBMITTED" %}
+                <form method="post" action="{% url 'reservations:internal_action' r.reference %}" class="d-inline">
+                  {% csrf_token %}
+                  <input type="hidden" name="action" value="approve">
+                  <button type="submit" class="btn btn-sm btn-success" title="Approve"><i class="bi bi-check"></i></button>
+                </form>
+                <form method="post" action="{% url 'reservations:internal_action' r.reference %}" class="d-inline" onsubmit="return confirm('Reject this internal booking?')">
+                  {% csrf_token %}
+                  <input type="hidden" name="action" value="reject">
+                  <button type="submit" class="btn btn-sm btn-outline-danger" title="Reject"><i class="bi bi-x"></i></button>
+                </form>
+              {% elif r.status == "APPROVED" %}
+                <form method="post" action="{% url 'reservations:internal_action' r.reference %}" class="d-inline" onsubmit="return confirm('Cancel this internal booking?')">
+                  {% csrf_token %}
+                  <input type="hidden" name="action" value="cancel">
+                  <button type="submit" class="btn btn-sm btn-outline-danger" title="Cancel"><i class="bi bi-x-circle"></i></button>
+                </form>
+              {% endif %}
+            </td>
+          </tr>
+          {% empty %}
+          <tr>
+            <td colspan="7" class="text-center py-5 text-muted">
+              <i class="bi bi-calendar-x fs-1 d-block mb-3"></i>
+              No internal reservations found.
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,39 @@
+{% extends "hall/base.html" %}
+{% load static %}
+{% block content %}
+  <div class="row justify-content-center">
+    <div class="col-md-8 col-lg-6">
+      <div class="card app-card">
+        <div class="card-body p-4">
+          <div class="text-center mb-3">
+            <img src="{% static 'images/lasu_logo.png' %}" alt="LASU logo" style="width:64px;height:64px;object-fit:contain;">
+            <h1 class="h4 mt-2 mb-1">Create an account</h1>
+            <div class="text-body-secondary">Students and staff can book halls in minutes.</div>
+          </div>
+
+          <form method="post" class="vstack gap-3">
+            {% csrf_token %}
+            <div>
+              <label class="form-label">Username (optional)</label>
+              <input class="form-control" type="text" name="username" placeholder="e.g., jdoe">
+            </div>
+            <div>
+              <label class="form-label">Email</label>
+              <input class="form-control" type="email" name="email" required placeholder="you@lasu.edu.ng">
+            </div>
+            <div>
+              <label class="form-label">Password</label>
+              <input class="form-control" type="password" name="password" required>
+            </div>
+            <button class="btn btn-success btn-lg" type="submit"><i class="bi bi-person-plus"></i> Register</button>
+          </form>
+
+          <div class="mt-3 small text-center">
+            Already have an account? <a href="{% url 'users:login' %}">Login</a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+{% endblock %}
+

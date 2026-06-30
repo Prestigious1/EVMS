@@ -1,0 +1,141 @@
+{% extends "hall/base.html" %}
+{% block title %}System Logs - EVMS Admin{% endblock %}
+{% block content %}
+<div class="d-flex flex-wrap justify-content-between align-items-end gap-3 mb-4">
+  <div>
+    <nav aria-label="breadcrumb">
+      <ol class="breadcrumb mb-1">
+        <li class="breadcrumb-item"><a href="{% url 'reservations:admin_dashboard' %}" class="text-decoration-none">Admin Hub</a></li>
+        <li class="breadcrumb-item active" aria-current="page">System Logs</li>
+      </ol>
+    </nav>
+    <h1 class="h3 mb-0"><i class="bi bi-terminal text-primary me-2"></i>System Log Viewer</h1>
+  </div>
+  <div class="d-flex gap-2">
+    <a href="{% url 'reports:export_logs_csv' %}?type={{ log_type }}&q={{ q }}" class="btn btn-outline-secondary"><i class="bi bi-download me-1"></i> Export Data</a>
+  </div>
+</div>
+
+<div class="card border-0 shadow-sm mb-4">
+  <div class="card-header bg-white border-bottom-0 pt-4 pb-0">
+    <ul class="nav nav-tabs border-bottom-0 gap-2">
+      <li class="nav-item">
+        <a class="nav-link {% if log_type == 'audit' %}active fw-bold text-primary border-bottom border-primary border-3{% else %}text-muted border-0{% endif %}" href="?type=audit&q={{ q }}">
+          <i class="bi bi-shield-check me-1"></i> Audit Logs
+        </a>
+      </li>
+      <li class="nav-item">
+        <a class="nav-link {% if log_type == 'login' %}active fw-bold text-primary border-bottom border-primary border-3{% else %}text-muted border-0{% endif %}" href="?type=login&q={{ q }}">
+          <i class="bi bi-box-arrow-in-right me-1"></i> Login Logs
+        </a>
+      </li>
+      <li class="nav-item">
+        <a class="nav-link {% if log_type == 'activity' %}active fw-bold text-primary border-bottom border-primary border-3{% else %}text-muted border-0{% endif %}" href="?type=activity&q={{ q }}">
+          <i class="bi bi-activity me-1"></i> Activity Logs
+        </a>
+      </li>
+    </ul>
+  </div>
+  <div class="card-body bg-light border-top">
+    <form method="GET" class="row g-2 align-items-center">
+      <input type="hidden" name="type" value="{{ log_type }}">
+      <div class="col-md-8">
+        <div class="input-group">
+          <span class="input-group-text bg-white border-end-0"><i class="bi bi-search text-muted"></i></span>
+          <input type="text" name="q" value="{{ q }}" class="form-control border-start-0" placeholder="Search logs (user, action, IP)...">
+        </div>
+      </div>
+      <div class="col-md-4 d-flex gap-2">
+        <button type="submit" class="btn btn-primary w-100">Search</button>
+        {% if q %}
+          <a href="?type={{ log_type }}" class="btn btn-outline-secondary" title="Clear"><i class="bi bi-x-circle"></i></a>
+        {% endif %}
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="card border-0 shadow-sm">
+  <div class="table-responsive">
+    <table class="table table-hover table-sm align-middle mb-0 font-monospace" style="font-size: 0.85rem;">
+      <thead class="table-dark">
+        <tr>
+          <th class="ps-3">Timestamp</th>
+          <th>User</th>
+          
+          {% if log_type == 'audit' %}
+          <th>Model</th>
+          <th>Action</th>
+          
+          {% elif log_type == 'login' %}
+          <th>IP Address</th>
+          <th>User Agent</th>
+          
+          {% elif log_type == 'activity' %}
+          <th>Action</th>
+          <th>Affected Object</th>
+          
+          {% endif %}
+        </tr>
+      </thead>
+      <tbody>
+        {% for log in page_obj %}
+        <tr>
+          <td class="ps-3 text-muted" style="white-space: nowrap;">{{ log.timestamp|date:"Y-m-d H:i:s" }}</td>
+          <td>
+            {% if log.user %}
+              <a href="{% url 'users:admin_user_detail' log.user.pk %}" class="text-decoration-none fw-bold">{{ log.user.email }}</a>
+            {% else %}
+              <span class="text-muted">System / Anonymous</span>
+            {% endif %}
+          </td>
+          
+          {% if log_type == 'audit' %}
+          <td><span class="badge bg-secondary">{{ log.model_name }}</span></td>
+          <td class="text-wrap" style="max-width: 400px;">{{ log.action }}</td>
+          
+          {% elif log_type == 'login' %}
+          <td><span class="text-success">{{ log.ip_address|default:"-" }}</span></td>
+          <td class="text-truncate text-muted" style="max-width: 350px;" title="{{ log.user_agent }}">{{ log.user_agent|default:"-" }}</td>
+          
+          {% elif log_type == 'activity' %}
+          <td><span class="text-primary">{{ log.action }}</span></td>
+          <td class="text-truncate text-muted" style="max-width: 300px;">{{ log.affected_object|default:"-" }}</td>
+          
+          {% endif %}
+        </tr>
+        {% empty %}
+        <tr>
+          <td colspan="4" class="text-center py-5">
+            <i class="bi bi-file-earmark-x fs-2 text-muted d-block mb-2"></i>
+            <h6 class="text-muted">No {{ log_type }} logs found</h6>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  
+  {% if page_obj.has_other_pages %}
+  <div class="card-footer bg-white border-top py-2">
+    <nav>
+      <ul class="pagination pagination-sm justify-content-center mb-0">
+        {% if page_obj.has_previous %}
+          <li class="page-item"><a class="page-link shadow-sm" href="?type={{ log_type }}&page={{ page_obj.previous_page_number }}&q={{ q }}">Prev</a></li>
+        {% else %}
+          <li class="page-item disabled"><span class="page-link bg-light">Prev</span></li>
+        {% endif %}
+
+        <li class="page-item active"><span class="page-link shadow-sm">Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span></li>
+
+        {% if page_obj.has_next %}
+          <li class="page-item"><a class="page-link shadow-sm" href="?type={{ log_type }}&page={{ page_obj.next_page_number }}&q={{ q }}">Next</a></li>
+        {% else %}
+          <li class="page-item disabled"><span class="page-link bg-light">Next</span></li>
+        {% endif %}
+      </ul>
+    </nav>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

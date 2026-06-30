@@ -1,0 +1,73 @@
+{% extends "hall/base.html" %}
+{% load static %}
+{% block content %}
+<div class="card app-card">
+  <div class="card-header bg-transparent border-bottom d-flex justify-content-between align-items-center py-3">
+    <h1 class="h4 mb-0"><i class="bi bi-exclamation-triangle"></i> Penalty Management</h1>
+    <form method="get" class="d-flex gap-2">
+      <input type="text" name="user" value="{{ user_query }}" class="form-control form-control-sm" placeholder="Search user...">
+      <button type="submit" class="btn btn-outline-secondary btn-sm">Search</button>
+    </form>
+  </div>
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table class="table table-hover table-dark mb-0 align-middle">
+        <thead>
+          <tr>
+            <th class="ps-3">Date</th>
+            <th>User</th>
+            <th>Title</th>
+            <th>Amount</th>
+            <th>Reservation</th>
+            <th>Status</th>
+            <th class="text-end pe-3">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for penalty in penalties %}
+            <tr>
+              <td class="ps-3 text-body-secondary small">{{ penalty.created_at|date:"M d, Y" }}</td>
+              <td>
+                <div class="fw-semibold">{{ penalty.user.get_full_name|default:penalty.user.username }}</div>
+                <div class="small text-body-secondary">{{ penalty.user.email }}</div>
+              </td>
+              <td>{{ penalty.title }}</td>
+              <td class="fw-bold">₦{{ penalty.amount }}</td>
+              <td>
+                {% if penalty.reservation %}
+                  <a href="{% url 'reservations:detail' penalty.reservation.booking_reference %}">#{{ penalty.reservation.booking_reference }}</a>
+                {% else %}
+                  -
+                {% endif %}
+              </td>
+              <td>
+                {% if penalty.is_forgiven %}
+                  <span class="badge text-bg-secondary">Forgiven</span>
+                {% elif penalty.is_paid %}
+                  <span class="badge text-bg-success">Paid</span>
+                {% else %}
+                  <span class="badge text-bg-danger">Unpaid</span>
+                {% endif %}
+              </td>
+              <td class="text-end pe-3">
+                {% if not penalty.is_paid and not penalty.is_forgiven %}
+                  <form method="post" action="{% url 'reservations:forgive_penalty' penalty.id %}" style="display:inline;" onsubmit="return confirm('Forgive this penalty? This cannot be undone.');">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-sm btn-outline-warning">Forgive</button>
+                  </form>
+                {% else %}
+                  <button class="btn btn-sm btn-outline-secondary" disabled>Forgive</button>
+                {% endif %}
+              </td>
+            </tr>
+          {% empty %}
+            <tr>
+              <td colspan="7" class="text-center py-4 text-body-secondary">No penalties found.</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}

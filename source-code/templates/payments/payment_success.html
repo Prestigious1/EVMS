@@ -1,0 +1,46 @@
+{% extends "hall/base.html" %}
+{% block content %}
+  <div class="row justify-content-center">
+    <div class="col-lg-7">
+      <div class="card app-card border-success border-opacity-50">
+        <div class="card-body p-4 text-center">
+          <div class="display-4 text-success mb-2"><i class="bi bi-check-circle-fill"></i></div>
+          <h1 class="h4 mb-2">Payment successful</h1>
+          <p class="text-body-secondary mb-4">
+            Your Paystack payment was verified. A confirmation email has been sent{% if payment %} to <strong>{{ payment.user.email }}</strong>{% endif %}.
+          </p>
+          {% if payment %}
+            <div class="app-card p-3 text-start mb-4">
+              <div class="row g-2 small">
+                <div class="col-6 text-body-secondary">Amount</div><div class="col-6 fw-semibold">₦{{ payment.amount }}</div>
+                <div class="col-6 text-body-secondary">Paystack ref</div><div class="col-6 fw-semibold text-break">{{ payment.paystack_reference }}</div>
+                {% if payment.reservation %}
+                  <div class="col-6 text-body-secondary">Booking</div><div class="col-6 fw-semibold">{{ payment.reservation.booking_reference }}</div>
+                  <div class="col-6 text-body-secondary">Hall</div><div class="col-6">{{ payment.reservation.hall.name }}</div>
+                {% endif %}
+              </div>
+            </div>
+            <div class="d-grid gap-2 d-sm-flex justify-content-sm-center flex-wrap">
+              {% if request.user.is_authenticated %}
+                {% if payment.reservation %}
+                  <a class="btn btn-success" href="{% url 'reservations:receipt_pdf' payment.reservation.booking_reference %}"><i class="bi bi-filetype-pdf"></i> Booking receipt (PDF)</a>
+                  <a class="btn btn-outline-primary" href="{% url 'payments:invoice_pdf' payment.id %}"><i class="bi bi-receipt"></i> Payment invoice (PDF)</a>
+                {% else %}
+                  <a class="btn btn-success" href="{% url 'payments:invoice_pdf' payment.id %}"><i class="bi bi-receipt"></i> Download invoice</a>
+                {% endif %}
+                <a class="btn btn-outline-secondary" href="{% url 'reservations:my_reservations' %}">My reservations</a>
+                <a class="btn btn-outline-secondary" href="{% url 'payments:my_payments' %}">My payments</a>
+              {% else %}
+                <p class="small text-body-secondary mb-2">Sign in with the same account to download PDF receipts from the portal.</p>
+                {% url 'payments:payment_detail' payment.id as payment_detail_url %}
+                <a class="btn btn-success" href="{% url 'users:login' %}?next={{ payment_detail_url|urlencode }}">Sign in to view receipts</a>
+              {% endif %}
+            </div>
+          {% else %}
+            <a class="btn btn-success" href="{% url 'users:login' %}">Sign in</a>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+{% endblock %}

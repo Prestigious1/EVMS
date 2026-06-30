@@ -1,0 +1,138 @@
+{% extends "hall/base.html" %}
+{% block content %}
+<div class="d-flex flex-wrap justify-content-between align-items-end gap-2 mb-4">
+  <div>
+    <h1 class="h4 mb-1"><i class="bi bi-broadcast me-2 text-primary"></i>Communications Dashboard</h1>
+    <div class="text-body-secondary">Manage broadcasts and announcements visible to LASU users.</div>
+  </div>
+  <div class="d-flex gap-2">
+    <a href="{% url 'hall:broadcast_create_view' %}" class="btn btn-primary btn-sm">
+      <i class="bi bi-megaphone me-1"></i> New Broadcast
+    </a>
+    <a href="{% url 'hall:announcement_create_view' %}" class="btn btn-success btn-sm">
+      <i class="bi bi-pin-angle me-1"></i> New Announcement
+    </a>
+  </div>
+</div>
+
+<ul class="nav nav-tabs mb-4" id="commsTab">
+  <li class="nav-item"><button class="nav-link active" data-bs-toggle="tab" data-bs-target="#broadcasts-tab"><i class="bi bi-megaphone me-1"></i> Broadcasts ({{ broadcasts|length }})</button></li>
+  <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#announcements-tab"><i class="bi bi-pin-angle me-1"></i> Announcements ({{ announcements|length }})</button></li>
+</ul>
+
+<div class="tab-content">
+  <!-- Broadcasts Tab -->
+  <div class="tab-pane fade show active" id="broadcasts-tab">
+    <div class="card app-card">
+      <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+          <thead class="table-light">
+            <tr>
+              <th>Title</th>
+              <th>Target</th>
+              <th>Attachment</th>
+              <th>Sent By</th>
+              <th>Date</th>
+              <th class="text-end">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for bc in broadcasts %}
+            <tr>
+              <td class="fw-semibold">{{ bc.title }}</td>
+              <td>
+                {% if bc.target_role %}
+                  <span class="badge text-bg-secondary">{{ bc.target_role }}</span>
+                {% else %}
+                  <span class="badge text-bg-primary">All Users</span>
+                {% endif %}
+              </td>
+              <td>
+                {% if bc.attachment %}
+                  <a href="{{ bc.attachment.url }}" target="_blank" class="btn btn-outline-secondary btn-sm">
+                    <i class="bi bi-paperclip"></i> File
+                  </a>
+                {% else %}
+                  <span class="text-body-secondary small">—</span>
+                {% endif %}
+              </td>
+              <td class="small">{{ bc.created_by.username|default:"System" }}</td>
+              <td class="small text-body-secondary">{{ bc.created_at|date:"d M Y" }}</td>
+              <td class="text-end">
+                <form method="post" action="{% url 'hall:broadcast_delete_view' bc.pk %}" class="d-inline"
+                      onsubmit="return confirm('Delete this broadcast?')">
+                  {% csrf_token %}
+                  <button type="submit" class="btn btn-outline-danger btn-sm"><i class="bi bi-trash"></i></button>
+                </form>
+              </td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="6" class="text-body-secondary p-4 text-center">No broadcasts yet.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- Announcements Tab -->
+  <div class="tab-pane fade" id="announcements-tab">
+    <div class="card app-card">
+      <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+          <thead class="table-light">
+            <tr>
+              <th>Title</th>
+              <th>Published</th>
+              <th>Image</th>
+              <th>Attachment</th>
+              <th>Date</th>
+              <th class="text-end">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for ann in announcements %}
+            <tr>
+              <td class="fw-semibold">{{ ann.title }}</td>
+              <td>
+                {% if ann.is_published %}
+                  <span class="badge text-bg-success">Published</span>
+                {% else %}
+                  <span class="badge text-bg-secondary">Draft</span>
+                {% endif %}
+              </td>
+              <td>
+                {% if ann.image %}
+                  <img src="{{ ann.image.url }}" alt="" class="rounded" style="width:40px;height:40px;object-fit:cover;">
+                {% else %}
+                  <span class="text-body-secondary small">—</span>
+                {% endif %}
+              </td>
+              <td>
+                {% if ann.attachment %}
+                  <a href="{{ ann.attachment.url }}" target="_blank" class="btn btn-outline-secondary btn-sm">
+                    <i class="bi bi-paperclip"></i> File
+                  </a>
+                {% else %}
+                  <span class="text-body-secondary small">—</span>
+                {% endif %}
+              </td>
+              <td class="small text-body-secondary">{{ ann.created_at|date:"d M Y" }}</td>
+              <td class="text-end">
+                <form method="post" action="{% url 'hall:announcement_delete_view' ann.pk %}" class="d-inline"
+                      onsubmit="return confirm('Delete this announcement?')">
+                  {% csrf_token %}
+                  <button type="submit" class="btn btn-outline-danger btn-sm"><i class="bi bi-trash"></i></button>
+                </form>
+              </td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="6" class="text-body-secondary p-4 text-center">No announcements yet.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,134 @@
+{% extends "hall/base.html" %}
+{% block title %}Notifications{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1 class="h3 mb-1"><i class="bi bi-bell me-2 text-gold"></i>Notifications</h1>
+    <p class="page-subtitle">Booking updates, broadcasts and system reminders.</p>
+  </div>
+  <div class="d-flex align-items-center gap-2">
+    {% if unread_count %}
+      <span class="badge text-bg-danger rounded-pill px-3">{{ unread_count }} unread</span>
+    {% endif %}
+    <a href="{% url 'notifications:broadcast_list' %}" class="btn btn-sm btn-outline-secondary">
+      <i class="bi bi-megaphone me-1"></i> Broadcasts
+    </a>
+    <form method="post" action="{% url 'notifications:mark_all_read' %}">
+      {% csrf_token %}
+      <button class="btn btn-sm btn-outline-primary" type="submit" {% if not unread_count %}disabled{% endif %}>
+        <i class="bi bi-check2-all me-1"></i> Mark all read
+      </button>
+    </form>
+  </div>
+</div>
+
+<!-- Filter tabs -->
+<ul class="nav nav-pills mb-3 gap-1" id="notifTabs">
+  <li class="nav-item">
+    <button class="nav-link active" data-filter="all">All <span class="badge bg-secondary ms-1">{{ notifications|length }}</span></button>
+  </li>
+  <li class="nav-item">
+    <button class="nav-link" data-filter="unread">Unread <span class="badge bg-danger ms-1">{{ unread_count }}</span></button>
+  </li>
+  <li class="nav-item">
+    <button class="nav-link" data-filter="read">Read</button>
+  </li>
+</ul>
+
+<div class="vstack gap-2" id="notifList">
+  {% for n in notifications %}
+    <div class="card app-card notif-card {% if not n.is_read %}border-start border-3 border-warning{% endif %}"
+         data-read="{% if n.is_read %}true{% else %}false{% endif %}" id="notif_{{ n.pk }}">
+      <div class="card-body py-3">
+        <div class="d-flex justify-content-between align-items-start gap-3">
+          <!-- Icon -->
+          <div class="flex-shrink-0 mt-1">
+            <div class="stat-icon rounded-2 {% if not n.is_read %}bg-warning bg-opacity-15{% else %}bg-secondary bg-opacity-10{% endif %}" style="width:36px;height:36px;font-size:1rem;">
+              {% if not n.is_read %}
+                <i class="bi bi-bell-fill text-warning"></i>
+              {% else %}
+                <i class="bi bi-bell text-secondary opacity-50"></i>
+              {% endif %}
+            </div>
+          </div>
+
+          <!-- Content -->
+          <div class="flex-grow-1" style="min-width: 0;">
+            <div class="d-flex flex-wrap align-items-center gap-2 mb-1" style="cursor: pointer;" data-bs-toggle="collapse" data-bs-target="#notif-body-{{ n.pk }}">
+              {% if not n.is_read %}
+                <span class="badge text-bg-warning text-dark" style="font-size:.65rem;">NEW</span>
+              {% endif %}
+              <span class="fw-semibold text-body">{{ n.title }}</span>
+            </div>
+            <div class="small text-body-secondary mb-1 notif-preview" style="cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" data-bs-toggle="collapse" data-bs-target="#notif-body-{{ n.pk }}">
+              {{ n.message|striptags }}
+            </div>
+            <div class="collapse mt-2 mb-2" id="notif-body-{{ n.pk }}">
+              <div class="p-3 bg-secondary bg-opacity-10 rounded border border-secondary border-opacity-10 text-body small">
+                {{ n.message|safe }}
+              </div>
+            </div>
+            <div class="text-muted mt-2" style="font-size:.75rem;">
+              <i class="bi bi-clock me-1"></i>{{ n.created_at|timesince }} ago
+            </div>
+          </div>
+
+          <!-- Actions -->
+          <div class="flex-shrink-0 d-flex flex-column gap-1 align-items-end ms-2">
+            {% if n.link %}
+              {# 'Review Action' marks the notification as read AND navigates to the booking page in one click #}
+              <a href="{% url 'notifications:go' n.id %}" class="btn btn-sm btn-primary py-1 px-3 fw-medium">
+                Review Action
+              </a>
+            {% else %}
+              {# No action link — offer a plain mark-as-read button for unread notifications #}
+              {% if not n.is_read %}
+                <a href="{% url 'notifications:mark_read' n.id %}" class="btn btn-sm btn-outline-success py-1 px-3">
+                  <i class="bi bi-check2 me-1"></i>Mark as read
+                </a>
+              {% endif %}
+            {% endif %}
+            <form method="post" action="{% url 'notifications:delete' n.id %}"
+                  onsubmit="return confirm('Delete this notification?')">
+              {% csrf_token %}
+              <button class="btn btn-sm btn-outline-danger py-0 px-2" type="submit" title="Delete">
+                <i class="bi bi-trash3"></i>
+              </button>
+            </form>
+          </div>
+        </div>
+      </div>
+    </div>
+  {% empty %}
+    <div class="card app-card">
+      <div class="card-body text-center py-5">
+        <i class="bi bi-bell-slash fs-1 text-body-secondary opacity-50 d-block mb-3"></i>
+        <h5 class="text-body-secondary">No notifications yet</h5>
+        <p class="text-muted small mb-0">You'll be notified here when there are updates on your bookings.</p>
+      </div>
+    </div>
+  {% endfor %}
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function () {
+  'use strict';
+  // Filter tabs
+  document.querySelectorAll('#notifTabs .nav-link').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      document.querySelectorAll('#notifTabs .nav-link').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      const f = btn.dataset.filter;
+      document.querySelectorAll('.notif-card').forEach(function (card) {
+        if (f === 'all') { card.style.display = ''; }
+        else if (f === 'unread') { card.style.display = card.dataset.read === 'false' ? '' : 'none'; }
+        else { card.style.display = card.dataset.read === 'true' ? '' : 'none'; }
+      });
+    });
+  });
+})();
+</script>
+{% endblock %}

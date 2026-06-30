@@ -1,0 +1,52 @@
+{% extends "hall/base.html" %}
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-xl-8">
+    <div class="d-flex align-items-center gap-3 mb-4">
+      <a href="{% url 'hall:communications_dashboard' %}" class="btn btn-sm btn-outline-secondary">
+        <i class="bi bi-arrow-left"></i>
+      </a>
+      <h1 class="h4 mb-0"><i class="bi bi-megaphone me-2"></i>New Broadcast Message</h1>
+    </div>
+
+    <div class="card app-card">
+      <div class="card-body">
+        <form method="post" enctype="multipart/form-data">
+          {% csrf_token %}
+          <div class="vstack gap-3">
+            <div>
+              <label class="form-label fw-semibold" for="id_title">Title <span class="text-danger">*</span></label>
+              <input type="text" name="title" id="id_title" class="form-control" required maxlength="200" placeholder="e.g. System Maintenance Notice">
+            </div>
+            <div>
+              <label class="form-label fw-semibold" for="id_message">Message <span class="text-danger">*</span></label>
+              <textarea name="message" id="id_message" class="form-control rich-editor" rows="8" required></textarea>
+            </div>
+            <div>
+              <label class="form-label fw-semibold" for="id_target_role">Target Audience</label>
+              <select name="target_role" id="id_target_role" class="form-select">
+                <option value="">All Users</option>
+                {% for r in user_roles %}
+                  <option value="{{ r.0 }}">{{ r.1 }} only</option>
+                {% endfor %}
+              </select>
+              <div class="form-text">Leave as "All Users" to send to everyone.</div>
+            </div>
+            <div>
+              <label class="form-label fw-semibold" for="id_attachment">Attachment (optional)</label>
+              <input type="file" name="attachment" id="id_attachment" class="form-control">
+              <div class="form-text">PDF, Word, Image, or other documents. Users will be able to download it.</div>
+            </div>
+            <div class="d-flex gap-2">
+              <button type="submit" class="btn btn-primary">
+                <i class="bi bi-megaphone me-1"></i> Send Broadcast
+              </button>
+              <a class="btn btn-outline-secondary" href="{% url 'hall:communications_dashboard' %}">Cancel</a>
+            </div>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

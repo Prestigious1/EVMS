@@ -1,0 +1,87 @@
+{% extends "hall/base.html" %}
+{% load auth_extras %}
+
+{% block title %}{{ announcement.title }} — Announcements{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-lg-8">
+    <nav aria-label="breadcrumb">
+      <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="{% url 'hall:home' %}">Home</a></li>
+        <li class="breadcrumb-item"><a href="{% url 'hall:announcements' %}">Announcements</a></li>
+        <li class="breadcrumb-item active" aria-current="page">Detail</li>
+      </ol>
+    </nav>
+
+    <div class="card app-card mb-4 border-0 shadow-sm overflow-hidden">
+      {% if announcement.image %}
+        <img src="{{ announcement.image.url }}" alt="{{ announcement.title }}" class="img-fluid w-100" style="max-height: 400px; object-fit: cover;">
+      {% endif %}
+      <div class="card-body p-4 p-md-5">
+        <div class="d-flex flex-wrap gap-2 mb-3">
+          <span class="badge text-bg-primary">{{ announcement.category|default:"General" }}</span>
+          <span class="text-body-secondary small"><i class="bi bi-calendar3"></i> {{ announcement.created_at|date:"F d, Y" }}</span>
+          <span class="text-body-secondary small"><i class="bi bi-eye"></i> {{ announcement.view_count }} Views</span>
+        </div>
+        
+        <h1 class="h2 mb-4">{{ announcement.title }}</h1>
+        
+        <div class="d-flex align-items-center gap-2 mb-4 pb-4 border-bottom border-secondary border-opacity-25">
+          <div class="user-avatar" style="width: 40px; height: 40px; font-size: 1rem;">
+            {{ announcement.created_by.first_name|first|upper|default:announcement.created_by.username|first|upper }}
+          </div>
+          <div>
+            <div class="fw-semibold">{{ announcement.created_by.get_full_name|default:announcement.created_by.username }}</div>
+            <div class="small text-body-secondary">Author</div>
+          </div>
+        </div>
+
+        <div class="announcement-content" style="line-height: 1.7;">
+          {{ announcement.content|safe }}
+        </div>
+
+        {% if announcement.video %}
+          <div class="mt-4">
+            <h4 class="h5 mb-3"><i class="bi bi-camera-video me-2"></i>Video Attachment</h4>
+            <video controls class="w-100 rounded shadow-sm border">
+              <source src="{{ announcement.video.url }}" type="video/mp4">
+              Your browser does not support the video tag.
+            </video>
+          </div>
+        {% endif %}
+
+        {% if announcement.attachment %}
+          <div class="mt-4 pt-4 border-top border-secondary border-opacity-25">
+            <h4 class="h6 fw-semibold mb-3"><i class="bi bi-paperclip me-2"></i>Attachments</h4>
+            <a href="{{ announcement.attachment.url }}" class="btn btn-outline-secondary btn-sm" target="_blank" download>
+              <i class="bi bi-download me-1"></i> Download File
+            </a>
+          </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <div class="col-lg-4">
+    <div class="card app-card border-0 shadow-sm sticky-top" style="top: 100px;">
+      <div class="card-header bg-transparent border-bottom border-secondary border-opacity-25 py-3">
+        <h3 class="h6 mb-0 fw-semibold">Related Announcements</h3>
+      </div>
+      <div class="card-body p-0">
+        <div class="list-group list-group-flush">
+          {% for rel in related %}
+            <a href="{% url 'hall:announcement_detail' rel.id %}" class="list-group-item list-group-item-action py-3 border-secondary border-opacity-10 hover-lift">
+              <div class="fw-semibold mb-1">{{ rel.title }}</div>
+              <div class="small text-body-secondary mb-1">{{ rel.content|striptags|truncatechars:60 }}</div>
+              <div class="small text-gold"><i class="bi bi-calendar3 me-1"></i> {{ rel.created_at|date:"M d, Y" }}</div>
+            </a>
+          {% empty %}
+            <div class="p-3 text-body-secondary small">No related announcements.</div>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

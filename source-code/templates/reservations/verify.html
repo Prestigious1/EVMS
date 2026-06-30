@@ -1,0 +1,63 @@
+{% extends "hall/base.html" %}
+{% block content %}
+  <div class="d-flex flex-wrap justify-content-between align-items-end gap-2 mb-3">
+    <div>
+      <h1 class="h4 mb-1">Reservation verification</h1>
+      <div class="text-body-secondary">Use this page to confirm a booking reference is valid.</div>
+    </div>
+    <a class="btn btn-outline-secondary btn-sm" href="{% url 'reservations:my_reservations' %}"><i class="bi bi-arrow-left"></i> Back</a>
+  </div>
+
+  <div class="card app-card">
+    <div class="card-body">
+      <div class="row g-3">
+        <div class="col-md-6">
+          <div class="text-body-secondary small">Reference</div>
+          <div class="fs-5 fw-semibold">{{ reservation.booking_reference }}</div>
+        </div>
+        <div class="col-md-6">
+          <div class="text-body-secondary small">Status</div>
+          <div>
+            {% if reservation.status == "SUBMITTED" or reservation.status == "FORWARDED" or reservation.status == "UNDER_REVIEW" %}
+              <span class="badge text-bg-primary">{{ reservation.get_status_display }}</span>
+            {% elif reservation.status == "AVAILABLE" or reservation.status == "APPROVED_PAYMENT" or reservation.status == "PAYMENT_PENDING" %}
+              <span class="badge text-bg-warning">{{ reservation.get_status_display }}</span>
+            {% elif reservation.status == "PAID" or reservation.status == "CONFIRMED" %}
+              <span class="badge text-bg-danger">{{ reservation.get_status_display }}</span>
+            {% elif reservation.status == "COMPLETED" or reservation.status == "INSPECTION_PENDING" %}
+              <span class="badge text-bg-info">{{ reservation.get_status_display }}</span>
+            {% elif reservation.status == "DAMAGE_REPORTED" %}
+              <span class="badge text-bg-danger">{{ reservation.get_status_display }}</span>
+            {% elif reservation.status == "REJECTED" or reservation.status == "CANCELLED" %}
+              <span class="badge text-bg-secondary">{{ reservation.get_status_display }}</span>
+            {% elif reservation.status == "CLOSED" %}
+              <span class="badge text-bg-dark">{{ reservation.get_status_display }}</span>
+            {% else %}
+              <span class="badge text-bg-light text-dark">{{ reservation.get_status_display }}</span>
+            {% endif %}
+          </div>
+        </div>
+
+        <div class="col-md-6">
+          <div class="text-body-secondary small">Hall</div>
+          <div class="fw-semibold">{{ reservation.hall.name }}</div>
+          <div class="text-body-secondary small">{{ reservation.hall.faculty }} • {{ reservation.hall.building }}</div>
+        </div>
+        <div class="col-md-3">
+          <div class="text-body-secondary small">Date</div>
+          <div class="fw-semibold">{{ reservation.booking_date }}</div>
+        </div>
+        <div class="col-md-3">
+          <div class="text-body-secondary small">Time</div>
+          <div class="fw-semibold">{{ reservation.start_time }} – {{ reservation.end_time }}</div>
+        </div>
+
+        <div class="col-12">
+          <div class="text-body-secondary small">Purpose</div>
+          <div class="fw-semibold">{{ reservation.get_purpose_display }}</div>
+        </div>
+      </div>
+    </div>
+  </div>
+{% endblock %}
+

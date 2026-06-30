@@ -1,0 +1,117 @@
+{% extends "hall/base.html" %}
+{% block title %}{% if u %}Edit User - {{ u.email }}{% else %}Create New User{% endif %}{% endblock %}
+{% block content %}
+<div class="d-flex flex-wrap justify-content-between align-items-end gap-3 mb-4">
+  <div>
+    <nav aria-label="breadcrumb">
+      <ol class="breadcrumb mb-1">
+        <li class="breadcrumb-item"><a href="{% url 'reservations:admin_dashboard' %}" class="text-decoration-none">Admin Hub</a></li>
+        <li class="breadcrumb-item"><a href="{% url 'users:admin_user_list' %}" class="text-decoration-none">Users</a></li>
+        {% if u %}
+          <li class="breadcrumb-item"><a href="{% url 'users:admin_user_detail' u.pk %}" class="text-decoration-none">{{ u.username }}</a></li>
+          <li class="breadcrumb-item active" aria-current="page">Edit</li>
+        {% else %}
+          <li class="breadcrumb-item active" aria-current="page">New User</li>
+        {% endif %}
+      </ol>
+    </nav>
+    <h1 class="h3 mb-0">
+      {% if u %}
+        <i class="bi bi-person-lines-fill text-primary me-2"></i>Edit User
+      {% else %}
+        <i class="bi bi-person-plus-fill text-primary me-2"></i>Create New User
+      {% endif %}
+    </h1>
+  </div>
+</div>
+
+<div class="row justify-content-center">
+  <div class="col-lg-8">
+    <div class="card border-0 shadow-sm">
+      <div class="card-body p-4 p-md-5">
+        <form method="POST">
+          {% csrf_token %}
+          
+          <h5 class="fw-bold mb-4 text-primary border-bottom pb-2">Account Information</h5>
+          
+          <div class="row g-3 mb-4">
+            <div class="col-md-6">
+              <label class="form-label fw-medium">Username <span class="text-danger">*</span></label>
+              <input type="text" name="username" class="form-control" value="{{ u.username|default:'' }}" {% if u %}readonly{% endif %} required>
+              {% if u %}<div class="form-text">Username cannot be changed after creation.</div>{% endif %}
+            </div>
+            <div class="col-md-6">
+              <label class="form-label fw-medium">Email Address <span class="text-danger">*</span></label>
+              <input type="email" name="email" class="form-control" value="{{ u.email|default:'' }}" {% if u %}readonly{% endif %} required>
+              {% if u %}<div class="form-text">Email cannot be changed after creation.</div>{% endif %}
+            </div>
+          </div>
+
+          <div class="row g-3 mb-4">
+            <div class="col-md-6">
+              <label class="form-label fw-medium">First Name</label>
+              <input type="text" name="first_name" class="form-control" value="{{ u.first_name|default:'' }}">
+            </div>
+            <div class="col-md-6">
+              <label class="form-label fw-medium">Last Name</label>
+              <input type="text" name="last_name" class="form-control" value="{{ u.last_name|default:'' }}">
+            </div>
+          </div>
+
+          <div class="row g-3 mb-5">
+            <div class="col-md-6">
+              <label class="form-label fw-medium">Role <span class="text-danger">*</span></label>
+              <select name="role" class="form-select" required>
+                {% for r_value, r_label in roles %}
+                  <option value="{{ r_value }}" {% if u and u.role == r_value %}selected{% endif %}>{{ r_label }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label fw-medium">Department</label>
+              <input type="text" name="department" class="form-control" value="{{ u.department|default:'' }}">
+            </div>
+          </div>
+
+          <h5 class="fw-bold mb-4 text-primary border-bottom pb-2">Security & Status</h5>
+          
+          <div class="mb-4">
+            <label class="form-label fw-medium">{% if u %}Reset Password (Leave blank to keep current){% else %}Initial Password <span class="text-danger">*</span>{% endif %}</label>
+            <input type="password" name="password" class="form-control" {% if not u %}required{% endif %}>
+          </div>
+
+          {% if u %}
+          <div class="row g-4 mb-5 p-3 bg-light rounded border border-light-subtle">
+            <div class="col-md-4">
+              <div class="form-check form-switch">
+                <input class="form-check-input" type="checkbox" role="switch" id="is_active" name="is_active" {% if u.is_active %}checked{% endif %}>
+                <label class="form-check-label fw-medium" for="is_active">Account Active</label>
+              </div>
+              <div class="form-text small">If disabled, the user cannot log in.</div>
+            </div>
+            <div class="col-md-4">
+              <div class="form-check form-switch">
+                <input class="form-check-input" type="checkbox" role="switch" id="is_verified" name="is_verified" {% if u.is_verified %}checked{% endif %}>
+                <label class="form-check-label fw-medium" for="is_verified">Email Verified</label>
+              </div>
+            </div>
+            <div class="col-md-4">
+              <div class="form-check form-switch">
+                <input class="form-check-input" type="checkbox" role="switch" id="is_blocked" name="is_blocked" {% if u.is_blocked %}checked{% endif %}>
+                <label class="form-check-label fw-medium text-danger" for="is_blocked">Block User</label>
+              </div>
+              <div class="form-text small text-danger">Blocked users cannot make reservations.</div>
+            </div>
+          </div>
+          {% endif %}
+
+          <div class="d-flex justify-content-end gap-2 mt-4 pt-3 border-top">
+            <a href="{% if u %}{% url 'users:admin_user_detail' u.pk %}{% else %}{% url 'users:admin_user_list' %}{% endif %}" class="btn btn-outline-secondary">Cancel</a>
+            <button type="submit" class="btn btn-primary px-4"><i class="bi bi-save me-1"></i> {% if u %}Save Changes{% else %}Create User{% endif %}</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

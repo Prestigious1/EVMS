@@ -1,0 +1,1299 @@
+{% extends "hall/base.html" %}
+{% load static %}
+{% block title %}Booking Case: {{ reservation.booking_reference }} — EVMS{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+
+  {# ─────────────────────────────────────────── Header Row ─────────────────────────────────────────── #}
+  <div class="d-flex flex-wrap justify-content-between align-items-start mb-4 gap-3">
+    <div>
+      <h1 class="h3 mb-0">Booking Case: <span class="text-primary font-monospace">{{ reservation.booking_reference }}</span></h1>
+      <div class="text-body-secondary small mt-1">
+        Submitted by <strong>{{ reservation.user.get_full_name|default:reservation.user.email }}</strong>
+        on {{ reservation.created_at|date:"M d, Y H:i" }}
+      </div>
+    </div>
+    <div class="d-flex align-items-center gap-2">
+      {# ── Semantic Status Badge from Action Engine ── #}
+      <span class="badge text-bg-{{ badge_variant }} px-3 py-2 fs-6 d-flex align-items-center gap-2">
+        <span class="badge-dot rounded-circle" style="width:8px;height:8px;background:rgba(255,255,255,0.5);display:inline-block;"></span>
+        {{ badge_label }}
+      </span>
+      {% if can_view_all %}
+      <a href="{% url 'reservations:admin_dashboard' %}" class="btn btn-outline-secondary btn-sm">
+        <i class="bi bi-grid-3x3-gap me-1"></i> Admin Dashboard
+      </a>
+      {% elif can_manage_ventures %}
+      <a href="{% url 'reservations:ventures_dashboard' %}" class="btn btn-outline-primary btn-sm">
+        <i class="bi bi-kanban me-1"></i> Ventures Dashboard
+      </a>
+      {% elif can_manage_facility %}
+      <a href="{% url 'reservations:facility_dashboard' %}" class="btn btn-outline-info btn-sm">
+        <i class="bi bi-building me-1"></i> Facility Dashboard
+      </a>
+      {% elif can_manage_bursary %}
+      <a href="{% url 'reservations:bursary_dashboard' %}" class="btn btn-outline-success btn-sm">
+        <i class="bi bi-bank me-1"></i> Bursary Dashboard
+      </a>
+      {% endif %}
+    </div>
+  </div>
+
+  {# ─────────────────────────────────────── Payment Authorization Alert ──────────────────────────────── #}
+  {% if can_manage_ventures and reservation.case_status == BookingCaseStatus.PAYMENT_AUTHORIZATION %}
+  <div class="alert alert-warning border-0 shadow-sm d-flex align-items-center gap-3 mb-4 py-3 px-4" role="alert" style="border-left: 4px solid #f0ad4e !important;">
+    <div class="flex-shrink-0">
+      <i class="bi bi-credit-card-2-front-fill fs-4 text-warning"></i>
+    </div>
+    <div class="flex-grow-1">
+      <strong>Payment Authorization In Progress</strong>
+      <div class="small text-body-secondary mt-1">This booking is at the Payment Authorization stage. Review billing details, apply or reject coupons, and set a payment deadline before issuing the payment request to the applicant.</div>
+    </div>
+    <div class="flex-shrink-0">
+      <a href="{% url 'reservations:payment_authorization' booking_reference=reservation.booking_reference %}" class="btn btn-warning btn-sm fw-semibold px-4">
+        <i class="bi bi-arrow-right-circle me-1"></i> Open Payment Authorization
+      </a>
+    </div>
+  </div>
+  {% endif %}
+
+  {# ─────────────────────────────────── Open Inspection Alert (Facility) ──────────────────────────────── #}
+  {% if can_manage_facility and reservation.case_status == BookingCaseStatus.EVENT_COMPLETED %}
+  <div class="alert alert-info border-0 shadow-sm d-flex align-items-center gap-3 mb-4 py-3 px-4" role="alert" style="border-left: 4px solid #0d6efd !important;">
+    <div class="flex-shrink-0">
+      <i class="bi bi-clipboard2-check-fill fs-4 text-info"></i>
+    </div>
+    <div class="flex-grow-1">
+      <strong>Post-Event Inspection Required</strong>
+      <div class="small text-body-secondary mt-1">The event has been marked as completed. You must now open a post-event inspection to record the hall's condition.</div>
+    </div>
+    <div class="flex-shrink-0">
+      <form method="post" action="{% url 'reservations:facility_action' reservation.booking_reference %}" class="d-inline">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="open_inspection">
+        <button type="submit" class="btn btn-info btn-sm fw-semibold px-4 text-white">
+          <i class="bi bi-clipboard2-check me-1"></i> Open Inspection
+        </button>
+      </form>
+    </div>
+  </div>
+  {% endif %}
+
+  {# ─────────────────────────────── Applicant: Awaiting Payment Alert ─────────────────────────────── #}
+  {% if is_applicant and reservation.case_status == BookingCaseStatus.AWAITING_PAYMENT %}
+  <div class="alert alert-warning border-0 shadow-sm d-flex align-items-center gap-3 mb-4 py-3 px-4" role="alert" style="border-left: 4px solid #ffc107 !important;">
+    <div class="flex-shrink-0">
+      <i class="bi bi-cash-coin fs-4 text-warning"></i>
+    </div>
+    <div class="flex-grow-1">
+      <strong>Payment Required</strong>
+      <div class="small text-body-secondary mt-1">Ventures has authorized your payment. Please complete payment to proceed. Go to the <strong>Financials</strong> tab to pay online or upload a bank transfer receipt.</div>
+      {% if payment_auth and payment_auth.payment_deadline %}
+      <div class="small text-danger mt-1">
+        <i class="bi bi-clock-history me-1"></i> <strong>Deadline:</strong> {{ payment_auth.payment_deadline|date:"d M Y H:i" }}
+      </div>
+      {% endif %}
+    </div>
+    <div class="flex-shrink-0">
+      <button class="btn btn-warning btn-sm fw-semibold px-4" onclick="document.querySelector('#financials-tab').click()">
+        <i class="bi bi-arrow-right-circle me-1"></i> View Payment Options
+      </button>
+    </div>
+  </div>
+  {% endif %}
+
+  {# ─────────────────────────────── Applicant: Damage Payment Alert ────────────────────────────────── #}
+  {% if is_applicant and reservation.case_status == BookingCaseStatus.AWAITING_DAMAGE_PAYMENT %}
+  <div class="alert alert-danger border-0 shadow-sm d-flex align-items-center gap-3 mb-4 py-3 px-4" role="alert" style="border-left: 4px solid #dc3545 !important;">
+    <div class="flex-shrink-0">
+      <i class="bi bi-exclamation-triangle-fill fs-4 text-danger"></i>
+    </div>
+    <div class="flex-grow-1">
+      <strong>Damage Payment Required</strong>
+      <div class="small text-body-secondary mt-1">Damage has been assessed for this booking. You must pay the outstanding damage fee to resolve your account and restore booking privileges.</div>
+    </div>
+    <div class="flex-shrink-0">
+      <button class="btn btn-danger btn-sm fw-semibold px-4" onclick="document.querySelector('#financials-tab').click()">
+        <i class="bi bi-arrow-right-circle me-1"></i> View Damage Payment
+      </button>
+    </div>
+  </div>
+  {% endif %}
+
+  {# ─────────────────────────────────────── Django Messages ────────────────────────────────────────── #}
+  {% if messages %}
+    {% for msg in messages %}
+    <div class="alert alert-{{ msg.tags|default:'info' }} alert-dismissible fade show small" role="alert">
+      {{ msg }}
+      <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>
+    {% endfor %}
+  {% endif %}
+
+  {# ═══════════════════════════════════════════ TAB PANEL ═══════════════════════════════════════════ #}
+  <div class="card shadow-sm border-0 mb-4">
+    <div class="card-header bg-body border-bottom-0 pt-4 pb-0">
+      <ul class="nav nav-tabs card-header-tabs flex-wrap" id="bookingTabs" role="tablist">
+
+        <li class="nav-item" role="presentation">
+          <button class="nav-link active" id="overview-tab" data-bs-toggle="tab" data-bs-target="#overview" type="button" role="tab" aria-selected="true">
+            <i class="bi bi-file-text me-1"></i>Overview
+          </button>
+        </li>
+        <li class="nav-item" role="presentation">
+          <button class="nav-link" id="timeline-tab" data-bs-toggle="tab" data-bs-target="#timeline" type="button" role="tab" aria-selected="false">
+            <i class="bi bi-clock-history me-1"></i>Timeline
+          </button>
+        </li>
+        <li class="nav-item" role="presentation">
+          <button class="nav-link" id="financials-tab" data-bs-toggle="tab" data-bs-target="#financials" type="button" role="tab" aria-selected="false">
+            <i class="bi bi-cash-stack me-1"></i>Financials
+          </button>
+        </li>
+        <li class="nav-item" role="presentation">
+          <button class="nav-link" id="documents-tab" data-bs-toggle="tab" data-bs-target="#documents" type="button" role="tab" aria-selected="false">
+            <i class="bi bi-folder2-open me-1"></i>Documents
+          </button>
+        </li>
+        <li class="nav-item" role="presentation">
+          <button class="nav-link" id="communication-tab" data-bs-toggle="tab" data-bs-target="#communication" type="button" role="tab" aria-selected="false">
+            <i class="bi bi-chat-dots me-1"></i>Communication
+          </button>
+        </li>
+        <li class="nav-item" role="presentation">
+          <button class="nav-link" id="inspection-tab" data-bs-toggle="tab" data-bs-target="#inspection" type="button" role="tab" aria-selected="false">
+            <i class="bi bi-clipboard2-check me-1"></i>Inspection
+          </button>
+        </li>
+
+        {% if can_manage_bursary or can_view_all %}
+        <li class="nav-item" role="presentation">
+          <button class="nav-link text-success fw-semibold" id="bursary-tab" data-bs-toggle="tab" data-bs-target="#bursary" type="button" role="tab" aria-selected="false">
+            <i class="bi bi-bank me-1"></i>Bursary
+            {% if reservation.case_status == BookingCaseStatus.UNDER_BURSARY_VERIFICATION or reservation.case_status == BookingCaseStatus.UNDER_DAMAGE_PAYMENT_VERIFICATION %}
+            <span class="badge bg-danger ms-1">Action Required</span>
+            {% endif %}
+          </button>
+        </li>
+        {% endif %}
+
+        {% if can_manage_ventures or can_view_all %}
+        <li class="nav-item" role="presentation">
+          <button class="nav-link text-primary fw-semibold" id="ventures-tab" data-bs-toggle="tab" data-bs-target="#ventures" type="button" role="tab" aria-selected="false">
+            <i class="bi bi-building me-1"></i>Ventures
+            {% if dynamic_actions.ventures %}
+            <span class="badge bg-primary ms-1">{{ dynamic_actions.ventures|length }}</span>
+            {% endif %}
+          </button>
+        </li>
+        {% endif %}
+
+        {% if can_manage_facility or can_view_all %}
+        <li class="nav-item" role="presentation">
+          <button class="nav-link text-info fw-semibold" id="facility-tab" data-bs-toggle="tab" data-bs-target="#facility" type="button" role="tab" aria-selected="false">
+            <i class="bi bi-tools me-1"></i>Facility
+            {% if dynamic_actions.facility %}
+            <span class="badge bg-info text-white ms-1">{{ dynamic_actions.facility|length }}</span>
+            {% endif %}
+          </button>
+        </li>
+        {% endif %}
+
+        {% if request.user.is_staff %}
+        <li class="nav-item" role="presentation">
+          <button class="nav-link text-secondary" id="audit-tab" data-bs-toggle="tab" data-bs-target="#audit" type="button" role="tab" aria-selected="false">
+            <i class="bi bi-journal-text me-1"></i>Audit
+          </button>
+        </li>
+        {% endif %}
+
+      </ul>
+    </div>{# end card-header #}
+
+    <div class="card-body p-4">
+      <div class="tab-content" id="bookingTabsContent">
+
+        {# ═══════ TAB 1: OVERVIEW ═══════ #}
+        <div class="tab-pane fade show active" id="overview" role="tabpanel" aria-labelledby="overview-tab">
+          <div class="row g-4">
+
+            <div class="col-md-6">
+              <h5 class="mb-3 border-bottom pb-2">Applicant Details</h5>
+              <div class="bg-body-tertiary p-3 rounded">
+                <div class="fw-semibold">{{ reservation.user.get_full_name|default:reservation.user.username }}</div>
+                <div class="text-body-secondary small mb-2">{{ reservation.user.email }}</div>
+                {% if reservation.user.department %}
+                  <div class="small"><strong>Dept:</strong> {{ reservation.user.department }}</div>
+                {% endif %}
+                <div class="small"><strong>Role:</strong> <span class="badge bg-secondary">{{ reservation.user.role }}</span></div>
+                {% if reservation.user.is_restricted %}
+                  <div class="badge bg-danger mt-2"><i class="bi bi-slash-circle me-1"></i>Account Restricted</div>
+                {% endif %}
+              </div>
+            </div>
+
+            <div class="col-md-6">
+              <h5 class="mb-3 border-bottom pb-2">Event Details</h5>
+              <div class="bg-body-tertiary p-3 rounded">
+                <div class="row mb-2">
+                  <div class="col-4 text-body-secondary small">Hall:</div>
+                  <div class="col-8 fw-semibold">{{ reservation.hall.name }}</div>
+                </div>
+                <div class="row mb-2">
+                  <div class="col-4 text-body-secondary small">Event:</div>
+                  <div class="col-8">{{ reservation.event_name|default:"—" }} ({{ reservation.get_purpose_display }})</div>
+                </div>
+                <div class="row mb-2">
+                  <div class="col-4 text-body-secondary small">Attendees:</div>
+                  <div class="col-8">{{ reservation.attendees_count }}</div>
+                </div>
+                <div class="row mb-2">
+                  <div class="col-4 text-body-secondary small">Date:</div>
+                  <div class="col-8">{{ reservation.booking_date|date:"M d, Y" }} &nbsp; {{ reservation.start_time|time:"H:i" }}–{{ reservation.end_time|time:"H:i" }}</div>
+                </div>
+              </div>
+            </div>
+
+            {% if reservation.notes %}
+            <div class="col-12">
+              <h5 class="mb-3 border-bottom pb-2">Applicant Notes</h5>
+              <div class="bg-body-tertiary p-3 rounded">{{ reservation.notes|linebreaks }}</div>
+            </div>
+            {% endif %}
+
+            {# ── Admin Override ── #}
+            {% if can_view_all %}
+            <div class="col-12">
+              <h5 class="mb-3 border-bottom pb-2 text-danger"><i class="bi bi-shield-lock text-danger me-2"></i>Admin Override</h5>
+              <div class="bg-body-tertiary p-3 rounded border border-danger">
+                <p class="small text-body-secondary mb-3">Admin overrides bypass workflow validation. Use with extreme caution. All actions are permanently logged.</p>
+                <form method="post" action="{% url 'reservations:admin_booking_action' reservation.booking_reference %}" class="d-flex align-items-center gap-2 flex-wrap">
+                  {% csrf_token %}
+                  <select name="action" class="form-select w-auto form-select-sm" required>
+                    <option value="">-- Select Admin Action --</option>
+                    {% for act in dynamic_actions.admin %}
+                    <option value="{{ act.value }}">{{ act.label }}</option>
+                    {% endfor %}
+                  </select>
+                  <input type="text" name="reason" class="form-control form-control-sm w-auto flex-grow-1" placeholder="Admin justification note (required)" required>
+                  <button type="submit" class="btn btn-danger btn-sm" onclick="return confirm('Are you sure you want to execute this admin override?')">Execute Override</button>
+                </form>
+              </div>
+            </div>
+            {% endif %}
+
+          </div>
+        </div>{# end #overview #}
+
+
+        {# ═══════ TAB 2: TIMELINE ═══════ #}
+        <div class="tab-pane fade" id="timeline" role="tabpanel" aria-labelledby="timeline-tab">
+          <h5 class="mb-3 border-bottom pb-2">Workflow Timeline</h5>
+          <div class="timeline-wrapper ms-3 border-start border-2 border-primary ps-4 position-relative">
+            {% for event in reservation.timeline_events.all %}
+              <div class="mb-4 position-relative">
+                <div class="position-absolute translate-middle-x rounded-circle
+                  {% if 'PAYMENT' in event.event_type %}bg-warning
+                  {% elif 'REJECTED' in event.event_type or 'DAMAGE' in event.event_type %}bg-danger
+                  {% elif 'CLOSED' in event.event_type or 'APPROVED' in event.event_type %}bg-success
+                  {% else %}bg-primary{% endif %}"
+                  style="width: 12px; height: 12px; left: -1.6rem; top: 0.3rem;"></div>
+                <div class="fw-semibold
+                  {% if 'PAYMENT' in event.event_type %}text-warning
+                  {% elif 'REJECTED' in event.event_type or 'DAMAGE' in event.event_type %}text-danger
+                  {% elif 'CLOSED' in event.event_type or 'APPROVED' in event.event_type %}text-success
+                  {% else %}text-primary{% endif %}">
+                  {{ event.title|default:event.get_event_type_display }}
+                </div>
+                <div class="small text-body-secondary mb-1">
+                  {{ event.timestamp|date:"M d, Y H:i" }}
+                  {% if event.actor %} — by {{ event.actor.get_full_name|default:event.actor.username }}{% else %} — System{% endif %}
+                </div>
+                {% if event.description %}
+                  <div class="bg-body-tertiary p-2 rounded small mt-1">{{ event.description }}</div>
+                {% endif %}
+                {% if event.event_type == 'PAYMENT_AUTHORIZATION_OPENED' and can_manage_ventures and reservation.case_status == BookingCaseStatus.PAYMENT_AUTHORIZATION %}
+                  <div class="mt-2">
+                    <a href="{% url 'reservations:payment_authorization' booking_reference=reservation.booking_reference %}" class="btn btn-outline-warning btn-sm">
+                      <i class="bi bi-arrow-right-circle me-1"></i> Resume Payment Authorization
+                    </a>
+                  </div>
+                {% endif %}
+              </div>
+            {% empty %}
+              <div class="text-body-secondary small py-3"><i class="bi bi-info-circle me-1"></i>No timeline events recorded yet.</div>
+            {% endfor %}
+          </div>
+        </div>{# end #timeline #}
+
+
+        {# ═══════ TAB 3: FINANCIALS ═══════ #}
+        <div class="tab-pane fade" id="financials" role="tabpanel" aria-labelledby="financials-tab">
+          <div class="row g-4">
+
+            {# ── Main Financials Column ── #}
+            <div class="col-md-7">
+              <h5 class="mb-3 border-bottom pb-2">Booking Financials</h5>
+
+              {# ── Dynamic State Alert ── #}
+              {% if reservation.case_status == BookingCaseStatus.PAYMENT_AUTHORIZATION %}
+              <div class="alert alert-secondary small d-flex align-items-center">
+                <i class="bi bi-hourglass-split me-2 fs-5"></i>
+                <div>
+                  <strong>Calculating final costs...</strong><br>
+                  Ventures is currently reviewing the booking to authorize payment and apply any applicable discounts or charges.
+                </div>
+              </div>
+              {% elif reservation.case_status == BookingCaseStatus.AWAITING_PAYMENT %}
+              <div class="alert alert-warning small d-flex align-items-center">
+                <i class="bi bi-credit-card me-2 fs-5"></i>
+                <div>
+                  <strong>Payment Required</strong><br>
+                  Please complete the payment of <strong>₦{{ reservation.total_cost }}</strong>. 
+                  {% if payment_auth and payment_auth.payment_deadline %}
+                    Deadline: {{ payment_auth.payment_deadline|date:"d M Y H:i" }}
+                  {% endif %}
+                </div>
+              </div>
+              {% elif reservation.case_status == BookingCaseStatus.PAYMENT_SUBMITTED or reservation.case_status == BookingCaseStatus.UNDER_BURSARY_VERIFICATION %}
+              <div class="alert alert-info small d-flex align-items-center">
+                <i class="bi bi-shield-lock me-2 fs-5"></i>
+                <div>
+                  <strong>Payment Under Verification</strong><br>
+                  Your payment evidence has been submitted and is currently being verified by the Bursary department.
+                </div>
+              </div>
+              {% elif reservation.case_status == BookingCaseStatus.PAYMENT_REJECTED %}
+              <div class="alert alert-danger small d-flex align-items-center">
+                <i class="bi bi-exclamation-triangle me-2 fs-5"></i>
+                <div>
+                  <strong>Payment Proof Rejected</strong><br>
+                  Bursary rejected your payment evidence. Please review messages and upload a corrected receipt.
+                </div>
+              </div>
+              {% elif reservation.case_status == BookingCaseStatus.PAYMENT_VERIFIED or reservation.case_status == BookingCaseStatus.AWAITING_FINAL_APPROVAL or reservation.case_status == BookingCaseStatus.BOOKING_APPROVED or reservation.case_status == BookingCaseStatus.EVENT_COMPLETED or reservation.case_status == BookingCaseStatus.CASE_CLOSED %}
+              <div class="alert alert-success small d-flex align-items-center justify-content-between">
+                <div class="d-flex align-items-center">
+                  <i class="bi bi-check-circle-fill me-2 fs-5"></i>
+                  <div>
+                    <strong>Payment Verified</strong><br>
+                    Your payment has been fully verified and settled.
+                  </div>
+                </div>
+                <a href="{% url 'payments:enterprise_receipt_pdf' booking_reference=reservation.booking_reference %}" class="btn btn-sm btn-success" target="_blank">
+                  <i class="bi bi-download me-1"></i>Official Receipt
+                </a>
+              </div>
+              {% endif %}
+
+              <div class="bg-body-tertiary p-3 rounded mb-4">
+                <div class="fw-semibold small text-uppercase text-muted mb-3 border-bottom pb-2">Financial Breakdown</div>
+                
+                <div class="d-flex justify-content-between mb-2 small">
+                  <span class="text-body-secondary">Base Hall Cost:</span>
+                  <span>₦{{ payment_auth.hall_price|default:reservation.total_cost|default:"0.00" }}</span>
+                </div>
+                
+                {% if payment_auth.coupon_code or reservation.coupon_code %}
+                  <div class="d-flex justify-content-between mb-2 small text-success">
+                    <span>Coupon Discount ({{ payment_auth.coupon_code|default:reservation.coupon_code }}):</span>
+                    <span>− ₦{{ payment_auth.coupon_discount|default:reservation.discount_amount_applied|default:"0.00" }}</span>
+                  </div>
+                {% endif %}
+                
+                {% if payment_auth.security_deposit or reservation.security_deposit %}
+                  <div class="d-flex justify-content-between mb-2 small">
+                    <span class="text-body-secondary">Security Deposit:</span>
+                    <span>₦{{ payment_auth.security_deposit|default:reservation.security_deposit|default:"0.00" }}</span>
+                  </div>
+                {% endif %}
+                
+                {% if payment_auth.extra_charges %}
+                  <div class="d-flex justify-content-between mb-2 small">
+                    <span class="text-body-secondary">Extra Charges:</span>
+                    <span>₦{{ payment_auth.extra_charges }}</span>
+                  </div>
+                {% endif %}
+                
+                {% if payment_auth.vat_amount %}
+                  <div class="d-flex justify-content-between mb-2 small">
+                    <span class="text-body-secondary">VAT:</span>
+                    <span>₦{{ payment_auth.vat_amount }}</span>
+                  </div>
+                {% endif %}
+                
+                <hr>
+                
+                <div class="d-flex justify-content-between fw-bold">
+                  <span>Total Cost:</span>
+                  <span class="text-primary fs-5">₦{{ reservation.total_cost|default:"TBC" }}</span>
+                </div>
+                {% if not reservation.total_cost %}
+                  <div class="text-warning small mt-2"><i class="bi bi-info-circle"></i> Cost has not been assigned by Ventures yet.</div>
+                {% endif %}
+              </div>
+
+              {# ── Applicant: Payment Actions ── #}
+              {% if is_applicant and reservation.case_status == BookingCaseStatus.AWAITING_PAYMENT and reservation.total_cost %}
+                <div class="card border-primary mb-4">
+                  <div class="card-header bg-primary text-white py-2">
+                    <h6 class="mb-0"><i class="bi bi-credit-card me-1"></i>Make Payment</h6>
+                  </div>
+                  <div class="card-body">
+                    <form method="post" action="{% url 'payments:start_reservation_payment' reservation.booking_reference %}" class="mb-3">
+                      {% csrf_token %}
+                      <button type="submit" class="btn btn-success w-100 fw-semibold">
+                        <i class="bi bi-shield-lock me-1"></i>Pay ₦{{ reservation.total_cost }} Online via Paystack
+                      </button>
+                    </form>
+                    
+                    <div class="text-center text-muted small mb-3">OR — Upload Bank Transfer Receipt</div>
+                    
+                    <form method="post" action="{% url 'reservations:submit_payment_proof' reservation.booking_reference %}" enctype="multipart/form-data" class="bg-body-tertiary p-3 rounded border">
+                      {% csrf_token %}
+                      <div class="mb-2">
+                        <label class="form-label small fw-semibold">Upload Receipt <span class="text-muted fw-normal">(PDF, JPEG, PNG)</span></label>
+                        <input type="file" name="receipt_file" class="form-control form-control-sm" accept=".pdf,.jpg,.jpeg,.png,.webp" required>
+                      </div>
+                      <div class="row g-2 mb-3">
+                        <div class="col-sm-6">
+                          <input type="text" name="transaction_ref" class="form-control form-control-sm" placeholder="Transaction Ref (Optional)">
+                        </div>
+                        <div class="col-sm-6">
+                          <input type="number" step="0.01" name="amount_claimed" class="form-control form-control-sm" placeholder="Amount Paid (₦)" required>
+                        </div>
+                      </div>
+                      <button type="submit" class="btn btn-outline-primary btn-sm w-100">Submit Payment Proof</button>
+                    </form>
+                  </div>
+                </div>
+              {% endif %}
+
+              {# ── Applicant: Re-upload after rejection ── #}
+              {% if is_applicant and reservation.case_status == BookingCaseStatus.PAYMENT_REJECTED %}
+                <div class="card border-danger mb-4">
+                  <div class="card-header bg-danger text-white py-2">
+                    <h6 class="mb-0"><i class="bi bi-exclamation-circle me-1"></i>Re-submit Payment Proof</h6>
+                  </div>
+                  <div class="card-body bg-danger-subtle">
+                    <form method="post" action="{% url 'reservations:submit_payment_proof' reservation.booking_reference %}" enctype="multipart/form-data">
+                      {% csrf_token %}
+                      <div class="mb-2">
+                        <label class="form-label small fw-semibold">Corrected Receipt</label>
+                        <input type="file" name="receipt_file" class="form-control form-control-sm" accept=".pdf,.jpg,.jpeg,.png,.webp" required>
+                      </div>
+                      <div class="row g-2 mb-3">
+                        <div class="col-sm-6">
+                          <input type="text" name="transaction_ref" class="form-control form-control-sm" placeholder="Transaction Ref">
+                        </div>
+                        <div class="col-sm-6">
+                          <input type="number" step="0.01" name="amount_claimed" class="form-control form-control-sm" placeholder="Amount (₦)" required>
+                        </div>
+                      </div>
+                      <button type="submit" class="btn btn-danger btn-sm w-100 fw-semibold">Submit Corrected Proof</button>
+                    </form>
+                  </div>
+                </div>
+              {% endif %}
+
+              {# ── Existing Payment Proofs ── #}
+              {% if booking_proofs %}
+                <h6 class="mb-3 border-bottom pb-2">Submitted Payment Evidence</h6>
+                <div class="vstack gap-2 mb-4">
+                {% for proof in booking_proofs %}
+                  <div class="d-flex justify-content-between align-items-center p-3 border rounded {% if proof.status == 'VERIFIED' %}border-success bg-success-subtle{% elif proof.status == 'REJECTED' %}border-danger bg-danger-subtle{% else %}bg-body-tertiary{% endif %}">
+                    <div>
+                      <div class="d-flex align-items-center mb-1">
+                        <span class="badge {% if proof.status == 'VERIFIED' %}bg-success{% elif proof.status == 'REJECTED' %}bg-danger{% else %}bg-warning text-dark{% endif %} me-2">{{ proof.get_status_display }}</span>
+                        <span class="small fw-semibold">₦{{ proof.amount_claimed|floatformat:2|default:"—" }}</span>
+                      </div>
+                      <div class="small text-muted">
+                        Ref: {{ proof.transaction_ref|default:"—" }} | {{ proof.uploaded_at|date:"d M Y H:i" }}
+                      </div>
+                      {% if proof.bursary_notes %}
+                        <div class="small text-danger mt-1"><strong>Note:</strong> {{ proof.bursary_notes }}</div>
+                      {% endif %}
+                    </div>
+                    {% if proof.receipt_file %}
+                      <a href="{{ proof.receipt_file.url }}" class="btn btn-sm btn-outline-secondary" target="_blank"><i class="bi bi-eye"></i></a>
+                    {% endif %}
+                  </div>
+                {% endfor %}
+                </div>
+              {% endif %}
+
+            </div>{# end Main Financials col #}
+
+            {# ── Right Column: Damage & Penalty Payments ── #}
+            <div class="col-md-5">
+              <h5 class="mb-3 border-bottom pb-2">Liabilities & Penalties</h5>
+              <div class="bg-body-tertiary p-3 rounded">
+                {% if outstanding_damage or outstanding_penalties %}
+                  <div class="alert alert-danger mb-3 p-2 small">
+                    <i class="bi bi-exclamation-circle-fill me-1"></i>
+                    <strong>Outstanding charges exist.</strong> Please settle these to restore full account privileges.
+                  </div>
+                {% endif %}
+
+                {# Damage Reports #}
+                <div class="mb-3">
+                  <h6 class="small fw-bold text-muted text-uppercase mb-2">Damage Reports</h6>
+                  {% for dr in reservation.damage_reports.all %}
+                    <div class="border p-3 bg-body rounded mb-3 border-start border-4 {% if dr.is_forgiven %}border-secondary{% elif dr.is_paid %}border-success{% else %}border-danger{% endif %}">
+                      <div class="d-flex justify-content-between align-items-center mb-2">
+                        <span class="fw-semibold small">Report #{{ dr.id }}</span>
+                        <span class="badge {% if dr.is_forgiven %}bg-secondary{% elif dr.is_paid %}bg-success{% else %}bg-danger{% endif %}">
+                          {% if dr.is_forgiven %}Forgiven{% elif dr.is_paid %}Paid{% else %}Unpaid{% endif %}
+                        </span>
+                      </div>
+                      <div class="small text-body-secondary mb-2">{{ dr.description|default:"No description." }}</div>
+                      <div class="fw-semibold mb-2 text-danger">Amount: ₦{{ dr.amount }}</div>
+
+                      {% if is_applicant and not dr.is_paid and not dr.is_forgiven and reservation.case_status == BookingCaseStatus.AWAITING_DAMAGE_PAYMENT %}
+                        <div class="mt-3 border-top pt-3">
+                          <form method="post" action="{% url 'payments:start_damage_payment' dr.id %}" class="mb-2">
+                            {% csrf_token %}
+                            <input type="hidden" name="damage_report_id" value="{{ dr.id }}">
+                            <button type="submit" class="btn btn-danger btn-sm w-100 fw-semibold">
+                              <i class="bi bi-credit-card me-1"></i>Pay Online
+                            </button>
+                          </form>
+                          
+                          <div class="text-center text-muted" style="font-size:0.7rem; margin: 4px 0;">OR UPLOAD PROOF</div>
+                          
+                          <form method="post" action="{% url 'reservations:submit_damage_payment_proof' reservation.booking_reference %}" enctype="multipart/form-data">
+                            {% csrf_token %}
+                            <div class="mb-1">
+                              <input type="file" name="receipt_file" class="form-control form-control-sm" accept=".pdf,.jpg,.jpeg,.png,.webp" required>
+                            </div>
+                            <div class="row g-1 mb-2">
+                              <div class="col-sm-6">
+                                <input type="text" name="transaction_ref" class="form-control form-control-sm" placeholder="Txn Ref">
+                              </div>
+                              <div class="col-sm-6">
+                                <input type="number" step="0.01" name="amount_claimed" class="form-control form-control-sm" placeholder="Amt (₦)" required>
+                              </div>
+                            </div>
+                            <button type="submit" class="btn btn-outline-danger btn-sm w-100">Submit Proof</button>
+                          </form>
+                        </div>
+                      {% endif %}
+                    </div>
+                  {% empty %}
+                    <div class="text-body-secondary small py-2"><i class="bi bi-check-circle me-1 text-success"></i>No damage charges.</div>
+                  {% endfor %}
+                </div>
+
+                {# Penalty Records #}
+                <div>
+                  <h6 class="small fw-bold text-muted text-uppercase mb-2">Penalties</h6>
+                  {% for pen in reservation.penalties.all %}
+                    <div class="border p-2 bg-body rounded mb-2 border-start border-4 {% if pen.is_forgiven %}border-secondary{% elif pen.is_paid %}border-success{% else %}border-warning{% endif %}">
+                      <div class="d-flex justify-content-between align-items-center">
+                        <span class="small fw-semibold">{{ pen.title }}</span>
+                        <span class="badge {% if pen.is_forgiven %}bg-secondary{% elif pen.is_paid %}bg-success{% else %}bg-warning text-dark{% endif %}">
+                          {% if pen.is_forgiven %}Forgiven{% elif pen.is_paid %}Paid{% else %}Outstanding{% endif %}
+                        </span>
+                      </div>
+                      <div class="small text-body-secondary mt-1">₦{{ pen.amount }}</div>
+                    </div>
+                  {% empty %}
+                    <div class="text-body-secondary small py-2"><i class="bi bi-check-circle me-1 text-success"></i>No penalties on this case.</div>
+                  {% endfor %}
+                </div>
+
+              </div>
+            </div>{# end Liabilities col #}
+
+          </div>
+        </div>{# end #financials #}
+
+
+        {# ═══════ TAB 4: DOCUMENTS ═══════ #}
+        <div class="tab-pane fade" id="documents" role="tabpanel" aria-labelledby="documents-tab">
+          <h5 class="mb-3 border-bottom pb-2">Attached Documents</h5>
+
+          {% with docs=reservation.documents.all %}
+          {% if docs %}
+            <div class="row g-3 mb-4">
+              {% for doc in docs %}
+                <div class="col-md-6">
+                  <div class="d-flex align-items-center bg-body-tertiary p-3 rounded border">
+                    <i class="bi bi-file-earmark-text fs-3 text-primary me-3"></i>
+                    <div class="flex-grow-1">
+                      <div class="fw-semibold">{{ doc.get_document_type_display }} (v{{ doc.version }})</div>
+                      <div class="small text-body-secondary">
+                        Uploaded by {{ doc.uploaded_by.username|default:"System" }} on {{ doc.uploaded_at|date:"M d, Y" }}
+                      </div>
+                      <div class="mt-1">
+                        {% if "APPLICANT" in doc.visible_to %}<span class="badge bg-secondary me-1" title="Visible to Applicant"><i class="bi bi-person me-1"></i>Applicant</span>{% endif %}
+                        {% if "FACILITY" in doc.visible_to %}<span class="badge bg-info me-1" title="Visible to Facility"><i class="bi bi-tools me-1"></i>Facility</span>{% endif %}
+                        {% if "VENTURES" in doc.visible_to %}<span class="badge bg-primary me-1" title="Visible to Ventures"><i class="bi bi-building me-1"></i>Ventures</span>{% endif %}
+                        {% if "BURSARY" in doc.visible_to %}<span class="badge me-1" style="background-color:#7c3aed;" title="Visible to Bursary"><i class="bi bi-bank me-1"></i>Bursary</span>{% endif %}
+                      </div>
+                    </div>
+                    <a href="{{ doc.file.url }}" class="btn btn-sm btn-outline-primary ms-2" target="_blank"><i class="bi bi-eye"></i></a>
+                  </div>
+                </div>
+              {% endfor %}
+            </div>
+          {% else %}
+            <div class="alert alert-secondary small">No documents have been uploaded to this case yet.</div>
+          {% endif %}
+          {% endwith %}
+
+          {% if reservation.case_status != BookingCaseStatus.CASE_CLOSED and reservation.case_status != BookingCaseStatus.BOOKING_REJECTED %}
+            <h6 class="mt-4 mb-2">Upload Additional Document</h6>
+            <form method="post" action="{% url 'reservations:upload_document' reservation.booking_reference %}" enctype="multipart/form-data" class="bg-body-tertiary p-3 rounded border">
+              {% csrf_token %}
+              <div class="row g-2 align-items-end">
+                <div class="col-md-5">
+                  <label class="form-label small">Document Type</label>
+                  <select name="document_type" class="form-select form-select-sm" required>
+                    {% for val, label in DocumentType.choices %}
+                      <option value="{{ val }}">{{ label }}</option>
+                    {% endfor %}
+                  </select>
+                </div>
+                <div class="col-md-5">
+                  <label class="form-label small">File</label>
+                  <input type="file" name="file" class="form-control form-control-sm" required>
+                </div>
+                <div class="col-md-2">
+                  <button type="submit" class="btn btn-primary btn-sm w-100">Upload</button>
+                </div>
+              </div>
+              <div class="mt-3 pt-2 border-top">
+                <div class="small fw-semibold text-body-secondary mb-2">
+                  <i class="bi bi-send me-1"></i>Route document to:
+                </div>
+                <div class="d-flex flex-wrap gap-3">
+                  {% if can_view_all or can_manage_ventures or can_manage_bursary %}
+                    <div class="form-check">
+                      <input class="form-check-input" type="checkbox" name="visible_to" value="APPLICANT" id="docTargetApplicant" checked>
+                      <label class="form-check-label small" for="docTargetApplicant">
+                        <span class="badge bg-secondary me-1"><i class="bi bi-person"></i></span>Applicant
+                      </label>
+                    </div>
+                    <div class="form-check">
+                      <input class="form-check-input" type="checkbox" name="visible_to" value="FACILITY" id="docTargetFacility">
+                      <label class="form-check-label small" for="docTargetFacility">
+                        <span class="badge bg-info me-1"><i class="bi bi-tools"></i></span>Facility
+                      </label>
+                    </div>
+                  {% endif %}
+                  {% if can_view_all or can_manage_bursary or can_manage_facility or is_applicant %}
+                    <div class="form-check">
+                      <input class="form-check-input" type="checkbox" name="visible_to" value="VENTURES" id="docTargetVentures" {% if not can_view_all and not can_manage_ventures and not can_manage_bursary %}checked{% endif %}>
+                      <label class="form-check-label small" for="docTargetVentures">
+                        <span class="badge bg-primary me-1"><i class="bi bi-building"></i></span>Ventures
+                        {% if not can_view_all and not can_manage_ventures and not can_manage_bursary %}<span class="text-muted small">(default)</span>{% endif %}
+                      </label>
+                    </div>
+                  {% endif %}
+                  {% if can_view_all or can_manage_ventures or can_manage_facility or is_applicant %}
+                    <div class="form-check">
+                      <input class="form-check-input" type="checkbox" name="visible_to" value="BURSARY" id="docTargetBursary">
+                      <label class="form-check-label small" for="docTargetBursary">
+                        <span class="badge me-1" style="background-color:#7c3aed;"><i class="bi bi-bank"></i></span>Bursary
+                      </label>
+                    </div>
+                  {% endif %}
+                </div>
+              </div>
+            </form>
+          {% endif %}
+        </div>{# end #documents #}
+
+
+        {# ═══════ TAB 5: COMMUNICATION ═══════ #}
+        <div class="tab-pane fade" id="communication" role="tabpanel" aria-labelledby="communication-tab">
+          <h5 class="mb-3 border-bottom pb-2">Communication Thread</h5>
+          <div class="vstack gap-3 mb-4 p-3 bg-body-tertiary rounded border" style="max-height: 500px; overflow-y: auto;">
+            {% for msg in thread_messages %}
+              <div class="d-flex flex-column {% if msg.sender == request.user %}align-items-end{% else %}align-items-start{% endif %}">
+                <div class="px-3 py-2 rounded-3 {% if msg.is_staff_note %}bg-warning-subtle text-warning-emphasis border border-warning-subtle{% elif msg.sender == request.user %}bg-primary text-white{% else %}bg-body border{% endif %}" style="max-width: 80%;">
+                  <div class="small fw-bold mb-1 {% if msg.sender == request.user and not msg.is_staff_note %}text-white-50{% else %}text-body-secondary{% endif %}">
+                    {{ msg.sender.get_full_name|default:msg.sender.username }}
+                    {% if msg.is_staff_note %} <span class="badge bg-warning text-dark ms-1">Staff Note</span>{% endif %}
+                    {% if msg.target_roles %}<span class="badge bg-light text-dark ms-1 small">→ {{ msg.target_roles }}</span>{% endif %}
+                  </div>
+                  {{ msg.content|linebreaksbr }}
+                </div>
+                <div class="small text-body-secondary mt-1" style="font-size: 0.75rem;">{{ msg.created_at|date:"M d, H:i" }}</div>
+              </div>
+            {% empty %}
+              <div class="text-center text-body-secondary small py-3">
+                <i class="bi bi-chat-square-dots fs-4 d-block mb-2"></i>No messages yet. Start the conversation below.
+              </div>
+            {% endfor %}
+          </div>
+
+          <form method="post" action="{% url 'reservations:add_thread_message' reservation.booking_reference %}">
+            {% csrf_token %}
+            <div class="mb-3">
+              <textarea name="content" class="form-control" rows="3" placeholder="Write a message..." required></textarea>
+            </div>
+            <div class="small mb-2 fw-semibold text-body-secondary">Send to:</div>
+            <div class="d-flex flex-wrap gap-3 mb-3">
+              {% if can_view_all %}
+                <div class="form-check"><input class="form-check-input" type="checkbox" name="target_roles" value="VENTURES" id="tgtVentures"><label class="form-check-label small" for="tgtVentures">Ventures</label></div>
+                <div class="form-check"><input class="form-check-input" type="checkbox" name="target_roles" value="BURSARY" id="tgtBursary"><label class="form-check-label small" for="tgtBursary">Bursary</label></div>
+                <div class="form-check"><input class="form-check-input" type="checkbox" name="target_roles" value="FACILITY" id="tgtFacility"><label class="form-check-label small" for="tgtFacility">Facility</label></div>
+                <div class="form-check"><input class="form-check-input" type="checkbox" name="target_roles" value="APPLICANT" id="tgtApplicant" checked><label class="form-check-label small text-primary" for="tgtApplicant">Applicant</label></div>
+              {% elif can_manage_facility %}
+                <div class="form-check"><input class="form-check-input" type="checkbox" name="target_roles" value="VENTURES" id="tgtVentures" checked><label class="form-check-label small" for="tgtVentures">Ventures</label></div>
+                <div class="form-check"><input class="form-check-input" type="checkbox" name="target_roles" value="BURSARY" id="tgtBursary"><label class="form-check-label small" for="tgtBursary">Bursary</label></div>
+              {% elif can_manage_ventures %}
+                <div class="form-check"><input class="form-check-input" type="checkbox" name="target_roles" value="FACILITY" id="tgtFacility"><label class="form-check-label small" for="tgtFacility">Facility</label></div>
+                <div class="form-check"><input class="form-check-input" type="checkbox" name="target_roles" value="BURSARY" id="tgtBursary"><label class="form-check-label small" for="tgtBursary">Bursary</label></div>
+                <div class="form-check"><input class="form-check-input" type="checkbox" name="target_roles" value="APPLICANT" id="tgtApplicant" checked><label class="form-check-label small text-primary" for="tgtApplicant">Applicant</label></div>
+              {% elif can_manage_bursary %}
+                <div class="form-check"><input class="form-check-input" type="checkbox" name="target_roles" value="VENTURES" id="tgtVentures"><label class="form-check-label small" for="tgtVentures">Ventures</label></div>
+                <div class="form-check"><input class="form-check-input" type="checkbox" name="target_roles" value="FACILITY" id="tgtFacility"><label class="form-check-label small" for="tgtFacility">Facility</label></div>
+                <div class="form-check"><input class="form-check-input" type="checkbox" name="target_roles" value="APPLICANT" id="tgtApplicant" checked><label class="form-check-label small text-primary" for="tgtApplicant">Applicant</label></div>
+              {% else %}
+                {# Applicant #}
+                <div class="form-check"><input class="form-check-input" type="checkbox" name="target_roles" value="VENTURES" id="tgtVentures" {% if "VENTURES" in default_reply_roles %}checked{% endif %}><label class="form-check-label small" for="tgtVentures">Ventures</label></div>
+                <div class="form-check"><input class="form-check-input" type="checkbox" name="target_roles" value="BURSARY" id="tgtBursary" {% if "BURSARY" in default_reply_roles %}checked{% endif %}><label class="form-check-label small" for="tgtBursary">Bursary</label></div>
+              {% endif %}
+            </div>
+            <div class="d-flex justify-content-end">
+              <button type="submit" class="btn btn-primary"><i class="bi bi-send me-1"></i>Send Message</button>
+            </div>
+          </form>
+        </div>{# end #communication #}
+
+
+        {# ═══════ TAB 6: INSPECTION ═══════ #}
+        <div class="tab-pane fade" id="inspection" role="tabpanel" aria-labelledby="inspection-tab">
+          <h5 class="mb-3 border-bottom pb-2">Post-Event Inspection</h5>
+
+          {% if inspection_report %}
+            <div class="bg-body-tertiary p-4 rounded border mb-4">
+              <div class="row g-4">
+                <div class="col-md-6">
+                  <h6 class="text-primary mb-3">Inspection Details</h6>
+                  <div class="small mb-1"><strong>Hall Condition:</strong> {{ inspection_report.get_hall_condition_display|default:"—" }}</div>
+                  <div class="small mb-1"><strong>Cleanliness:</strong> {{ inspection_report.get_cleanliness_display|default:"—" }}</div>
+                  <div class="small mb-1"><strong>Furniture:</strong> {{ inspection_report.get_furniture_status_display|default:"—" }}</div>
+                  <div class="small mb-1"><strong>Equipment:</strong> {{ inspection_report.get_equipment_status_display|default:"—" }}</div>
+                  <div class="small mb-1"><strong>Outcome:</strong>
+                    <span class="badge {% if inspection_report.damage_found %}bg-danger{% else %}bg-success{% endif %}">
+                      {{ inspection_report.get_outcome_display|default:"Pending" }}
+                    </span>
+                  </div>
+                  {% if inspection_report.notes %}<div class="small mt-2 bg-body p-2 rounded border">{{ inspection_report.notes }}</div>{% endif %}
+                </div>
+                <div class="col-md-6 border-start">
+                  <h6 class="text-primary mb-3">Inspector &amp; Date</h6>
+                  {% if inspection_report.officer %}
+                  <div class="small mb-1"><strong>Officer:</strong> {{ inspection_report.officer.get_full_name|default:inspection_report.officer.username }}</div>
+                  {% endif %}
+                  {% if inspection_report.inspected_at %}
+                  <div class="small mb-1"><strong>Inspected:</strong> {{ inspection_report.inspected_at|date:"M d, Y H:i" }}</div>
+                  {% endif %}
+                  {% if inspection_report.damage_found %}
+                  <div class="alert alert-danger small mt-3 mb-0">
+                    <i class="bi bi-exclamation-triangle-fill me-1"></i><strong>Damage was recorded.</strong> A damage assessment has been issued.
+                  </div>
+                  {% endif %}
+                </div>
+              </div>
+            </div>
+          {% elif legacy_inspection %}
+            <div class="bg-body-tertiary p-4 rounded border mb-4">
+              <h6 class="text-primary mb-3">Inspection Result</h6>
+              <div class="small mb-1"><strong>Result:</strong> {{ legacy_inspection.get_result_display }}</div>
+              <div class="small mb-3"><strong>Notes:</strong> {{ legacy_inspection.notes|default:"None" }}</div>
+              <div class="text-body-secondary small">
+                Inspected on {{ legacy_inspection.inspected_at|date:"M d, Y H:i" }}
+                by {{ legacy_inspection.inspector.username }}
+              </div>
+            </div>
+          {% else %}
+            {% if reservation.case_status != BookingCaseStatus.UNDER_POST_EVENT_INSPECTION %}
+            <div class="alert alert-secondary small">
+              <i class="bi bi-info-circle me-1"></i>
+              No inspection report exists yet.
+              {% if reservation.case_status == BookingCaseStatus.EVENT_COMPLETED %}
+              Facility must open an inspection first.
+              {% else %}
+              This booking has not yet reached the inspection stage.
+              {% endif %}
+            </div>
+            {% endif %}
+          {% endif %}
+
+          {# ── Inspection Form — ONLY visible during UNDER_POST_EVENT_INSPECTION ── #}
+          {% if can_manage_facility and reservation.case_status == BookingCaseStatus.UNDER_POST_EVENT_INSPECTION %}
+          <div class="card border-primary">
+            <div class="card-header bg-primary text-white">
+              <h6 class="mb-0"><i class="bi bi-clipboard2-check me-2"></i>Submit Post-Event Inspection Report</h6>
+            </div>
+            <div class="card-body">
+              <p class="small text-body-secondary mb-3">
+                Complete this form to record the post-event condition of the hall.
+                Selecting <strong>"Damage Found"</strong> as the outcome will transition the case to the Damage Assessment workflow.
+                Selecting any other outcome will close the case immediately.
+              </p>
+              <form method="post" action="{% url 'reservations:record_inspection_report' reservation.booking_reference %}" enctype="multipart/form-data">
+                {% csrf_token %}
+                <div class="row g-3 mb-3">
+                  <div class="col-md-6">
+                    <label class="form-label small fw-semibold">Hall Condition</label>
+                    <select name="hall_condition" class="form-select" required>
+                      {% for val, label in ConditionRating.choices %}
+                        <option value="{{ val }}">{{ label }}</option>
+                      {% endfor %}
+                    </select>
+                  </div>
+                  <div class="col-md-6">
+                    <label class="form-label small fw-semibold">Cleanliness</label>
+                    <select name="cleanliness" class="form-select" required>
+                      {% for val, label in ConditionRating.choices %}
+                        <option value="{{ val }}">{{ label }}</option>
+                      {% endfor %}
+                    </select>
+                  </div>
+                  <div class="col-md-6">
+                    <label class="form-label small fw-semibold">Furniture Status</label>
+                    <select name="furniture_status" class="form-select" required>
+                      {% for val, label in ConditionRating.choices %}
+                        <option value="{{ val }}">{{ label }}</option>
+                      {% endfor %}
+                    </select>
+                  </div>
+                  <div class="col-md-6">
+                    <label class="form-label small fw-semibold">Equipment Status</label>
+                    <select name="equipment_status" class="form-select" required>
+                      {% for val, label in ConditionRating.choices %}
+                        <option value="{{ val }}">{{ label }}</option>
+                      {% endfor %}
+                    </select>
+                  </div>
+                  <div class="col-12">
+                    <label class="form-label small fw-semibold">Post-Event Outcome <span class="text-danger">*</span></label>
+                    <select name="outcome" class="form-select" id="inspectionOutcome" required>
+                      <option value="">-- Select Outcome --</option>
+                      {% for val, label in InspectionOutcome.choices %}
+                        <option value="{{ val }}">{{ label }}</option>
+                      {% endfor %}
+                    </select>
+                  </div>
+                  <div class="col-12">
+                    <label class="form-label small fw-semibold">Inspection Notes</label>
+                    <textarea name="notes" class="form-control" rows="3" placeholder="Describe the condition of the hall after the event..."></textarea>
+                  </div>
+
+                  {# ── Damage Section (shown only if DAMAGE_FOUND selected) ── #}
+                  <div class="col-12" id="damageSection" style="display:none;">
+                    <div class="card border-danger">
+                      <div class="card-header bg-danger text-white small fw-semibold">
+                        <i class="bi bi-exclamation-triangle-fill me-1"></i>Damage Details
+                      </div>
+                      <div class="card-body">
+                        <div class="mb-2">
+                          <label class="form-label small fw-semibold">Damage Description</label>
+                          <textarea name="damage_description" class="form-control form-control-sm" rows="2" placeholder="Describe the damage..."></textarea>
+                        </div>
+                        <div class="mb-2">
+                          <label class="form-label small fw-semibold">Affected Items</label>
+                          <input type="text" name="affected_items" class="form-control form-control-sm" placeholder="e.g. 3 chairs, 1 projector screen">
+                        </div>
+                        <div class="mb-2">
+                          <label class="form-label small fw-semibold text-danger">Estimated Damage Cost (₦)</label>
+                          <input type="number" step="0.01" min="0" name="damage_amount" class="form-control form-control-sm" placeholder="0.00">
+                        </div>
+                        <div class="mb-2">
+                          <label class="form-label small fw-semibold">Damage Photos <span class="text-muted">(optional, multiple)</span></label>
+                          <input type="file" name="damage_photos" class="form-control form-control-sm" accept="image/*" multiple>
+                        </div>
+                        <div class="mb-0">
+                          <label class="form-label small fw-semibold">Supporting Documents <span class="text-muted">(optional)</span></label>
+                          <input type="file" name="damage_documents" class="form-control form-control-sm" multiple>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div class="col-12">
+                    <label class="form-label small fw-semibold">Inspection Photos <span class="text-muted">(optional, multiple allowed)</span></label>
+                    <input type="file" name="photos" class="form-control" accept="image/*" multiple>
+                  </div>
+                </div>
+                <div class="d-flex gap-2">
+                  <button type="submit" class="btn btn-primary" id="inspectionSubmitBtn">
+                    <i class="bi bi-clipboard2-check me-1"></i>Submit Inspection Report
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+          {% endif %}
+        </div>{# end #inspection #}
+
+
+        {# ═══════ TAB 7: BURSARY ═══════ #}
+        {% if can_manage_bursary or can_view_all %}
+        <div class="tab-pane fade" id="bursary" role="tabpanel" aria-labelledby="bursary-tab">
+          <div class="card shadow-sm border-0 border-start border-4 border-success">
+            <div class="card-header bg-success-subtle text-success-emphasis pt-3 pb-3">
+              <h6 class="mb-0 fw-semibold"><i class="bi bi-bank me-2"></i>Bursary Payment Verification Interface</h6>
+            </div>
+            <div class="card-body p-5 text-center">
+              <i class="bi bi-receipt fs-1 text-success mb-3 d-block"></i>
+              <h5 class="fw-bold mb-2">Dedicated Bursary Financial Review</h5>
+              <p class="text-body-secondary mb-4 mx-auto" style="max-width: 500px;">
+                The payment verification process has been consolidated into a dedicated, high-fidelity interface.
+                Click below to review official generated receipts, payment evidence, financial breakdowns, and execute Workflow Actions (Approve/Reject/Clarify).
+              </p>
+              
+              <a href="{% url 'payments:bursary_payment_review' reservation.booking_reference %}" class="btn btn-success btn-lg px-4 shadow-sm">
+                <i class="bi bi-box-arrow-up-right me-2"></i>Open Bursary Payment Review
+              </a>
+              
+              {% if reservation.case_status == BookingCaseStatus.UNDER_BURSARY_VERIFICATION %}
+                <div class="mt-4 animate-pulse">
+                  <span class="badge bg-warning text-dark px-3 py-2 border border-warning rounded-pill">
+                    <i class="bi bi-exclamation-circle-fill me-1"></i>Action Required: Payment Evidence is Awaiting Verification
+                  </span>
+                </div>
+              {% endif %}
+            </div>
+          </div>
+        </div>
+        {% endif %}{# end #bursary #}
+
+
+        {# ═══════ TAB 8: VENTURES ═══════ #}
+        {% if can_manage_ventures or can_view_all %}
+        <div class="tab-pane fade" id="ventures" role="tabpanel" aria-labelledby="ventures-tab">
+          <div class="bg-primary-subtle border border-primary-subtle p-4 rounded">
+            <h5 class="text-primary-emphasis mb-4"><i class="bi bi-building me-2"></i>Ventures Case Control</h5>
+
+            {# ── Primary Workflow Actions ── #}
+            {% if dynamic_actions.ventures %}
+            <div class="card shadow-sm border-primary mb-4">
+              <div class="card-header bg-primary text-white">
+                <h6 class="mb-0"><i class="bi bi-lightning-charge me-2"></i>Available Workflow Actions</h6>
+              </div>
+              <div class="card-body">
+                <p class="small text-body-secondary mb-3">
+                  Current Status: <strong class="badge text-bg-{{ badge_variant }}">{{ badge_label }}</strong>
+                </p>
+                <form method="post" action="{% url 'reservations:ventures_action' reservation.booking_reference %}">
+                  {% csrf_token %}
+                  <div class="d-grid gap-2 mb-3">
+                    {% for act in dynamic_actions.ventures %}
+                    <button type="submit" name="action" value="{{ act.value }}"
+                      class="btn btn-{{ act.variant }} d-flex align-items-center justify-content-between"
+                      {% if act.variant == 'danger' %}onclick="return confirm('{{ act.desc }}\n\nThis action cannot be undone. Proceed?')"{% endif %}>
+                      <span><i class="bi bi-{{ act.icon }} me-2"></i>{{ act.label }}</span>
+                      <small class="opacity-75 text-end">→ {{ act.destination }}</small>
+                    </button>
+                    {% endfor %}
+                  </div>
+                  <div class="mb-0">
+                    <label class="form-label small fw-semibold">Internal Notes / Reason</label>
+                    <textarea name="notes" class="form-control form-control-sm" rows="2" placeholder="Required for rejections. Optional for other actions."></textarea>
+                  </div>
+                </form>
+              </div>
+            </div>
+            {% else %}
+            <div class="alert alert-info small mb-4">
+              <i class="bi bi-info-circle me-1"></i>
+              No workflow actions are available for Ventures at the current stage:
+              <strong class="badge text-bg-{{ badge_variant }} ms-1">{{ badge_label }}</strong>.
+            </div>
+            {% endif %}
+
+            {# ── Payment Authorization Link ── #}
+            {% if reservation.case_status == BookingCaseStatus.PAYMENT_AUTHORIZATION %}
+            <div class="alert alert-warning d-flex justify-content-between align-items-center mb-4">
+              <span><i class="bi bi-credit-card me-2"></i><strong>Payment Authorization is open.</strong> Review billing and set payment deadline.</span>
+              <a href="{% url 'reservations:payment_authorization' booking_reference=reservation.booking_reference %}" class="btn btn-warning btn-sm">Open →</a>
+            </div>
+            {% endif %}
+
+            {# ── Penalty / Fine Management ── #}
+            <div class="card shadow-sm border-0 mb-4">
+              <div class="card-header bg-body-tertiary">
+                <h6 class="mb-0"><i class="bi bi-exclamation-octagon text-danger me-2"></i>Add Penalty / Fine</h6>
+              </div>
+              <div class="card-body">
+                <form method="post" action="{% url 'reservations:ventures_create_penalty' reservation.booking_reference %}">
+                  {% csrf_token %}
+                  <div class="row g-2 mb-2">
+                    <div class="col-md-5">
+                      <input type="text" name="title" class="form-control form-control-sm" placeholder="Penalty Title" required>
+                    </div>
+                    <div class="col-md-3">
+                      <input type="number" step="0.01" name="amount" class="form-control form-control-sm" placeholder="Amount (₦)" required>
+                    </div>
+                    <div class="col-md-4">
+                      <select name="penalty_type" class="form-select form-select-sm">
+                        <option value="PENALTY">General Penalty</option>
+                        <option value="LATE_FEE">Late Fee</option>
+                        <option value="DAMAGE_CHARGE">Damage Charge</option>
+                      </select>
+                    </div>
+                  </div>
+                  <div class="mb-2">
+                    <input type="text" name="description" class="form-control form-control-sm" placeholder="Description / Reason (optional)">
+                  </div>
+                  <button type="submit" class="btn btn-outline-danger btn-sm">Add Penalty</button>
+                </form>
+
+                {# Show existing penalties #}
+                {% if reservation.penalties.all %}
+                <div class="mt-3 border-top pt-3">
+                  <div class="small fw-semibold mb-2">Existing Penalties</div>
+                  {% for pen in reservation.penalties.all %}
+                  <div class="d-flex justify-content-between align-items-center bg-body-tertiary p-2 rounded mb-1 small">
+                    <div>
+                      <span class="badge {% if pen.is_forgiven %}bg-secondary{% elif pen.is_paid %}bg-success{% else %}bg-danger{% endif %} me-2">
+                        {% if pen.is_forgiven %}Forgiven{% elif pen.is_paid %}Paid{% else %}Outstanding{% endif %}
+                      </span>
+                      {{ pen.title }} — ₦{{ pen.amount }}
+                    </div>
+                    {% if not pen.is_forgiven and not pen.is_paid %}
+                    <a href="{% url 'reservations:forgive_penalty' pen.id %}" class="btn btn-xs btn-sm btn-outline-secondary py-0 px-1 small"
+                       onclick="return confirm('Forgive this penalty?')">Forgive</a>
+                    {% endif %}
+                  </div>
+                  {% endfor %}
+                </div>
+                {% endif %}
+              </div>
+            </div>
+
+            {# ── Coupon Management (only during PAYMENT_AUTHORIZATION stage) ── #}
+            {% if reservation.case_status == BookingCaseStatus.PAYMENT_AUTHORIZATION %}
+            <div class="card shadow-sm border-0">
+              <div class="card-header bg-body-tertiary">
+                <h6 class="mb-0"><i class="bi bi-tag text-primary me-2"></i>Coupon Review</h6>
+              </div>
+              <div class="card-body">
+                <p class="small text-body-secondary mb-2">
+                  Applicant requested coupon: <strong>{{ reservation.coupon_code|default:"None" }}</strong>
+                  {% if reservation.coupon_status %}<span class="badge bg-secondary ms-2">{{ reservation.coupon_status }}</span>{% endif %}
+                </p>
+                <form method="post" action="{% url 'reservations:apply_coupon' reservation.booking_reference %}">
+                  {% csrf_token %}
+                  <div class="input-group mb-0">
+                    <input type="text" name="coupon_code" class="form-control form-control-sm" placeholder="Enter coupon code to apply (leave blank to clear)" value="{{ reservation.coupon_code|default_if_none:'' }}">
+                    <button type="submit" class="btn btn-outline-primary btn-sm">Apply / Update</button>
+                  </div>
+                </form>
+                <div class="small text-body-secondary mt-1">
+                  <i class="bi bi-info-circle me-1"></i>Coupon changes should be made in the Payment Authorization page for full billing recalculation.
+                  <a href="{% url 'reservations:payment_authorization' booking_reference=reservation.booking_reference %}" class="ms-1">Open Payment Authorization →</a>
+                </div>
+              </div>
+            </div>
+            {% endif %}
+
+          </div>
+        </div>
+        {% endif %}{# end #ventures #}
+
+
+        {# ═══════ TAB 9: FACILITY ═══════ #}
+        {% if can_manage_facility or can_view_all %}
+        <div class="tab-pane fade" id="facility" role="tabpanel" aria-labelledby="facility-tab">
+          <div class="bg-info-subtle border border-info-subtle p-4 rounded">
+            <h5 class="text-info-emphasis mb-4"><i class="bi bi-tools me-2"></i>Facility Case Control</h5>
+
+            {# ── Primary Workflow Actions ── #}
+            {% if dynamic_actions.facility %}
+            <div class="card shadow-sm border-info mb-4">
+              <div class="card-header" style="background-color: #0dcaf0; color: white;">
+                <h6 class="mb-0"><i class="bi bi-lightning-charge me-2"></i>Available Workflow Actions</h6>
+              </div>
+              <div class="card-body">
+                <p class="small text-body-secondary mb-3">
+                  Current Status: <strong class="badge text-bg-{{ badge_variant }}">{{ badge_label }}</strong>
+                </p>
+                <form method="post" action="{% url 'reservations:facility_action' reservation.booking_reference %}">
+                  {% csrf_token %}
+                  <div class="d-grid gap-2 mb-3">
+                    {% for act in dynamic_actions.facility %}
+                    <button type="submit" name="action" value="{{ act.value }}"
+                      class="btn btn-{{ act.variant }} d-flex align-items-center justify-content-between"
+                      {% if act.variant == 'danger' or act.variant == 'success' %}onclick="return confirm('{{ act.desc }}\n\nProceed?')"{% endif %}>
+                      <span><i class="bi bi-{{ act.icon }} me-2"></i>{{ act.label }}</span>
+                      <small class="opacity-75 text-end">→ {{ act.destination }}</small>
+                    </button>
+                    {% endfor %}
+                  </div>
+                  <div class="mb-0">
+                    <label class="form-label small fw-semibold">Internal Notes</label>
+                    <textarea name="notes" class="form-control form-control-sm" rows="2" placeholder="Required for rejections. Optional for other actions."></textarea>
+                  </div>
+                </form>
+              </div>
+            </div>
+            {% else %}
+            <div class="alert alert-info small mb-4">
+              <i class="bi bi-info-circle me-1"></i>
+              No workflow actions are available for Facility at the current stage:
+              <strong class="badge text-bg-{{ badge_variant }} ms-1">{{ badge_label }}</strong>.
+            </div>
+            {% endif %}
+
+            {# Inspection report form is on the Inspection tab — link there #}
+            {% if reservation.case_status == BookingCaseStatus.UNDER_POST_EVENT_INSPECTION %}
+            <div class="alert alert-warning d-flex justify-content-between align-items-center">
+              <span><i class="bi bi-clipboard2-check me-2"></i><strong>Inspection In Progress.</strong> Complete the inspection report to resolve this case.</span>
+              <button class="btn btn-warning btn-sm" onclick="document.querySelector('#inspection-tab').click()">
+                Go to Inspection Form →
+              </button>
+            </div>
+            {% endif %}
+
+          </div>
+        </div>
+        {% endif %}{# end #facility #}
+
+
+        {# ═══════ TAB 10: AUDIT HISTORY ═══════ #}
+        {% if request.user.is_staff %}
+        <div class="tab-pane fade" id="audit" role="tabpanel" aria-labelledby="audit-tab">
+          <h5 class="mb-3 border-bottom pb-2"><i class="bi bi-journal-text me-2 text-secondary"></i>System Audit History</h5>
+
+          {# ── Booking Log entries ── #}
+          {% if reservation.logs.all %}
+          <h6 class="text-body-secondary small fw-semibold mb-2">Workflow Transition Log</h6>
+          <div class="table-responsive mb-4">
+            <table class="table table-sm table-hover align-middle" style="font-size:0.85rem;">
+              <thead class="table-light">
+                <tr>
+                  <th>Timestamp</th>
+                  <th>Actor</th>
+                  <th>Action</th>
+                  <th>Details</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for log in reservation.logs.all %}
+                <tr>
+                  <td class="text-body-secondary">{{ log.timestamp|date:"M d, Y H:i:s" }}</td>
+                  <td>{{ log.actor.username|default:"System" }}</td>
+                  <td><code>{{ log.action }}</code></td>
+                  <td class="text-body-secondary">{{ log.details|truncatechars:80|default:"—" }}</td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+          {% endif %}
+
+          {# ── AuditLog entries ── #}
+          <h6 class="text-body-secondary small fw-semibold mb-2">System Audit Log</h6>
+          <div class="table-responsive">
+            <table class="table table-sm table-hover align-middle" style="font-size:0.85rem;">
+              <thead class="table-light">
+                <tr>
+                  <th>Timestamp</th>
+                  <th>User</th>
+                  <th>Role</th>
+                  <th>Action</th>
+                  <th>Old Value</th>
+                  <th>New Value</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for log in audit_logs %}
+                <tr>
+                  <td class="text-body-secondary">{{ log.timestamp|date:"M d, Y H:i:s" }}</td>
+                  <td>{{ log.user.username }}</td>
+                  <td>{{ log.role }}</td>
+                  <td><code>{{ log.action }}</code></td>
+                  <td><span class="text-muted">{{ log.old_value|default:"—" }}</span></td>
+                  <td><span class="text-success">{{ log.new_value|default:"—" }}</span></td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="6" class="text-center py-4 text-muted">No audit log entries found for this case.</td></tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+        {% endif %}{# end #audit #}
+
+      </div>{# end .tab-content #}
+    </div>{# end .card-body #}
+  </div>{# end .card #}
+
+</div>{# end .container-fluid #}
+{% endblock %}
+
+
+{% block extra_js %}
+<script>
+document.addEventListener("DOMContentLoaded", function() {
+    const storageKey = 'activeTab_' + window.location.pathname;
+
+    // ── Auto-activate tab from URL hash or query param ──
+    let targetId = window.location.hash;
+    if (!targetId && window.location.search) {
+        const urlParams = new URLSearchParams(window.location.search);
+        const tabParam = urlParams.get('tab');
+        if (tabParam) targetId = "#" + tabParam;
+    }
+    if (!targetId) {
+        targetId = sessionStorage.getItem(storageKey);
+    }
+    if (targetId) {
+        const tabEl = document.querySelector(`button[data-bs-target="${targetId}"]`);
+        if (tabEl) new bootstrap.Tab(tabEl).show();
+    }
+
+    // ── Save active tab to sessionStorage & update URL on change ──
+    document.querySelectorAll('button[data-bs-toggle="tab"]').forEach(function(el) {
+        el.addEventListener('shown.bs.tab', function(event) {
+            const target = event.target.getAttribute('data-bs-target');
+            if (target) {
+                sessionStorage.setItem(storageKey, target);
+                history.replaceState(null, null, target);
+            }
+        });
+    });
+
+    // ── Document routing: ensure at least 1 checkbox always selected ──
+    const visCheckboxes = document.querySelectorAll('input[name="visible_to"]');
+    visCheckboxes.forEach(chk => {
+        chk.addEventListener('change', function(event) {
+            const checked = Array.from(visCheckboxes).filter(c => c.checked);
+            if (checked.length === 0) event.target.checked = true;
+        });
+    });
+
+    // ── Inspection form: show damage section only when DAMAGE_FOUND selected ──
+    const outcomeSelect = document.getElementById('inspectionOutcome');
+    const damageSection = document.getElementById('damageSection');
+    const submitBtn = document.getElementById('inspectionSubmitBtn');
+
+    if (outcomeSelect && damageSection) {
+        function toggleDamageSection() {
+            const val = outcomeSelect.value;
+            const isDamage = val === 'DAMAGE_FOUND';
+            damageSection.style.display = isDamage ? '' : 'none';
+            if (submitBtn) {
+                submitBtn.textContent = isDamage
+                    ? '⚠ Submit Inspection — Damage Found'
+                    : '✓ Submit Inspection — No Damage';
+                submitBtn.className = isDamage
+                    ? 'btn btn-danger'
+                    : 'btn btn-success';
+            }
+        }
+        outcomeSelect.addEventListener('change', toggleDamageSection);
+        toggleDamageSection(); // initial state
+    }
+});
+</script>
+{% endblock %}

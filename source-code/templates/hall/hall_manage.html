@@ -1,0 +1,81 @@
+{% extends "hall/base.html" %}
+{% block content %}
+<div class="d-flex align-items-center justify-content-between mb-4">
+  <div>
+    <h1 class="h4 mb-1"><i class="bi bi-building-gear me-2"></i>Hall Management</h1>
+    <p class="text-body-secondary small mb-0">Create, edit, and manage hall configurations and status.</p>
+  </div>
+  <a href="{% url 'hall:hall_create' %}" class="btn btn-success">
+    <i class="bi bi-plus-lg me-1"></i> New Hall
+  </a>
+</div>
+
+<div class="card app-card mb-4">
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table class="table table-hover align-middle mb-0" id="hallsTable">
+        <thead>
+          <tr class="text-body-secondary small">
+            <th class="px-4 py-3">Hall</th>
+            <th>Category</th>
+            <th>Capacity</th>
+            <th>Daily Rate</th>
+            <th>Status</th>
+            <th class="text-end px-4">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for hall in halls %}
+          <tr class="{% if hall.is_archived %}opacity-50{% endif %}">
+            <td class="px-4 py-3">
+              <div class="d-flex align-items-center gap-3">
+                {% with hall.cover_image as cover %}
+                  {% if cover %}
+                    <img src="{{ cover.image.url }}" alt="" class="rounded" style="width: 48px; height: 48px; object-fit: cover;">
+                  {% else %}
+                    <div class="rounded bg-secondary d-flex align-items-center justify-content-center text-white" style="width: 48px; height: 48px;">
+                      <i class="bi bi-building"></i>
+                    </div>
+                  {% endif %}
+                {% endwith %}
+                <div>
+                  <div class="fw-semibold">
+                    <a href="{% url 'hall:hall_update' pk=hall.pk %}" class="text-decoration-none text-body">{{ hall.name }}</a>
+                  </div>
+                  <div class="small text-body-secondary">{{ hall.faculty }} • {{ hall.building }}</div>
+                </div>
+              </div>
+            </td>
+            <td><span class="badge" style="background: rgba(255,255,255,0.1); color: var(--bs-body-color);">{{ hall.get_category_display }}</span></td>
+            <td>{{ hall.capacity }} <span class="small text-body-secondary">seats</span></td>
+            <td>
+              {% if hall.daily_rate %}₦{{ hall.daily_rate }}{% else %}<span class="text-body-secondary">—</span>{% endif %}
+            </td>
+            <td>
+              <span class="badge {{ hall.status_badge_class }}">{{ hall.status_label }}</span>
+            </td>
+            <td class="text-end px-4">
+              <div class="btn-group">
+                <a href="{% url 'hall:hall_detail' pk=hall.pk %}" class="btn btn-sm btn-outline-secondary" title="View publicly">
+                  <i class="bi bi-eye"></i>
+                </a>
+                <a href="{% url 'hall:hall_update' pk=hall.pk %}" class="btn btn-sm btn-outline-primary" title="Edit hall settings">
+                  <i class="bi bi-pencil"></i>
+                </a>
+              </div>
+            </td>
+          </tr>
+          {% empty %}
+          <tr>
+            <td colspan="6" class="text-center py-5 text-body-secondary">
+              <i class="bi bi-building-x d-block mb-3 fs-2"></i>
+              No halls found. <a href="{% url 'hall:hall_create' %}">Create the first one.</a>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}

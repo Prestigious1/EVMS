@@ -113,12 +113,14 @@ WSGI_APPLICATION = 'hms_prj.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/3.2/ref/settings/#databases
 
+import os
 import dj_database_url
 
 DATABASES = {
-    'default': dj_database_url.config(
-        default=env("DATABASE_URL", default=f"sqlite:///{BASE_DIR}/db.sqlite3"),
-        conn_max_age=600
+    "default": dj_database_url.config(
+        default=env.str("DATABASE_URL", default="sqlite:///" + str(BASE_DIR / "db.sqlite3")),
+        conn_max_age=600,
+        conn_health_checks=True,
     )
 }
 
@@ -225,7 +227,7 @@ JAZZMIN_SETTINGS = {
     # Jazzmin expects a path relative to STATIC_URL for static assets
     'site_logo': "images/lasu_logo.png",
     'login_logo': "images/lasu_logo.png",
-    'site_icon': "images/favicon.png",
+    'site_icon': "images/lasu_logo.png",
     'copyright':  "Lagos State University",
     "welcome_sign": "Welcome to LASU Hall Booking System",
     "topmenu_links": [

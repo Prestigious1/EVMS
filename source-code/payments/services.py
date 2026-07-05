@@ -25,27 +25,39 @@ class PaymentResolutionService:
         provider: str = PaymentProvider.PAYSTACK,
         proof_file=None,
         payment_type: str = PaymentProofType.BOOKING,
-        metadata: dict = None
+        metadata: dict = None,
+        existing_payment: Payment = None
     ):
         with transaction.atomic():
-            # 1. Check if payment already exists to prevent duplicates (especially for callbacks)
-            payment = Payment.objects.filter(
-                reservation=reservation,
-                transaction_reference=transaction_reference,
-                status=PaymentStatus.PAID
-            ).first()
-
-            if not payment:
-                payment = Payment.objects.create(
-                    user=actor or reservation.user,
+            if existing_payment:
+                payment = existing_payment
+                if payment.status != PaymentStatus.PAID:
+                    payment.status = PaymentStatus.PAID
+                    payment.transaction_reference = transaction_reference
+                    payment.payment_method = method
+                    payment.provider = provider
+                    payment.amount = amount
+                    payment.metadata = metadata or payment.metadata
+                    payment.save(update_fields=["status", "transaction_reference", "payment_method", "provider", "amount", "metadata"])
+            else:
+                # 1. Check if payment already exists to prevent duplicates (especially for callbacks)
+                payment = Payment.objects.filter(
                     reservation=reservation,
-                    amount=amount,
-                    status=PaymentStatus.PAID,
-                    payment_method=method,
-                    provider=provider,
                     transaction_reference=transaction_reference,
-                    metadata=metadata or {}
-                )
+                    status=PaymentStatus.PAID
+                ).first()
+
+                if not payment:
+                    payment = Payment.objects.create(
+                        user=actor or reservation.user,
+                        reservation=reservation,
+                        amount=amount,
+                        status=PaymentStatus.PAID,
+                        payment_method=method,
+                        provider=provider,
+                        transaction_reference=transaction_reference,
+                        metadata=metadata or {}
+                    )
             
             # 2. Create the unified PaymentProof for Bursary queue
             proof = PaymentProof.objects.filter(

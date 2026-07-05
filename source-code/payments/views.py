@@ -79,7 +79,8 @@ def _finalize_paystack_payment(*, payment: Payment, verification_payload: dict |
         actor=audit_user,
         provider=payment.provider,
         payment_type=payment_type,
-        metadata=metadata
+        metadata=metadata,
+        existing_payment=payment
     )
 
     if payment.damage_report_id:
@@ -219,6 +220,11 @@ def start_reservation_payment(request, booking_reference: str):
     callback_url = get_paystack_verify_callback_url(request=request)
 
     if not (payment.metadata or {}).get("authorization_url") or (payment.metadata or {}).get("paystack_init_error"):
+        if (payment.metadata or {}).get("paystack_init_error"):
+            # If the last initialization failed (e.g. Duplicate Transaction Reference),
+            # rotate the reference so we don't get stuck in a retry loop.
+            payment.paystack_reference = _new_reference("LASU_RES")
+            payment.save(update_fields=["paystack_reference"])
         try:
             init = initialize_transaction(
                 email=payment.user.email or "no-reply@example.com",
@@ -265,9 +271,14 @@ def start_damage_payment(request, damage_id: int):
         return redirect("reservations:my_reservations")
 
     amount = damage.amount or Decimal("0.00")
-    if amount <= 0:
-        messages.error(request, "This penalty has no payable amount.")
+    paid_amount = sum(p.amount for p in Payment.objects.filter(damage_report=damage, status=PaymentStatus.PAID))
+    outstanding = max(Decimal("0.00"), amount - paid_amount)
+    
+    if outstanding <= 0:
+        messages.error(request, "This penalty has no payable amount remaining.")
         return redirect("reservations:my_reservations")
+        
+    amount = outstanding
 
     payment = Payment.objects.create(
         user=damage.user,
@@ -330,9 +341,14 @@ def start_penalty_payment(request, penalty_id: int):
         return redirect("reservations:my_reservations")
 
     amount = penalty.amount or Decimal("0.00")
-    if amount <= 0:
-        messages.error(request, "This penalty has no payable amount.")
+    paid_amount = sum(p.amount for p in Payment.objects.filter(penalty=penalty, status=PaymentStatus.PAID))
+    outstanding = max(Decimal("0.00"), amount - paid_amount)
+    
+    if outstanding <= 0:
+        messages.error(request, "This penalty has no payable amount remaining.")
         return redirect("reservations:my_reservations")
+        
+    amount = outstanding
 
     payment = Payment.objects.create(
         user=penalty.user,
@@ -762,8 +778,25 @@ def enterprise_receipt_pdf(request, booking_reference: str):
         BookingCaseStatus.DAMAGE_PAYMENT_VERIFIED,
         BookingCaseStatus.CASE_CLOSED,
     }
+    
+    APPLICANT_ALLOWED_STATUSES = {
+        BookingCaseStatus.BOOKING_APPROVED,
+        BookingCaseStatus.EVENT_COMPLETED,
+        BookingCaseStatus.UNDER_POST_EVENT_INSPECTION,
+        BookingCaseStatus.DAMAGE_ASSESSED,
+        BookingCaseStatus.AWAITING_DAMAGE_PAYMENT,
+        BookingCaseStatus.DAMAGE_PAYMENT_SUBMITTED,
+        BookingCaseStatus.UNDER_DAMAGE_PAYMENT_VERIFICATION,
+        BookingCaseStatus.DAMAGE_PAYMENT_VERIFIED,
+        BookingCaseStatus.CASE_CLOSED,
+    }
+    
     if reservation.case_status not in ALLOWED_STATUSES:
         messages.error(request, "Official receipt is not available at this stage.")
+        return redirect("reservations:detail", booking_reference=booking_reference)
+        
+    if not is_staff_viewer and reservation.case_status not in APPLICANT_ALLOWED_STATUSES:
+        messages.error(request, "Final documents (including the official receipt) are only available after Ventures Final Approval.")
         return redirect("reservations:detail", booking_reference=booking_reference)
 
     # Most recent successful booking payment
@@ -845,15 +878,97 @@ def bursary_payment_review(request, booking_reference: str):
         except Exception:
             auth = None
 
-    # Payment & proofs
-    booking_payment = (
+    # ── Fetch ALL payments for this reservation (booking + damage + penalty) ──
+    all_payments_qs = (
         reservation.payments
-        .filter(status=PaymentStatus.PAID, damage_report__isnull=True, penalty__isnull=True)
+        .select_related("damage_report", "penalty", "user")
         .order_by("-created_at")
+    )
+
+    # Most recent booking-level paid payment (for receipt header)
+    booking_payment = (
+        all_payments_qs
+        .filter(status=PaymentStatus.PAID, damage_report__isnull=True, penalty__isnull=True)
         .first()
     )
-    booking_proofs = reservation.payment_proofs.filter(payment_type="BOOKING").order_by("-uploaded_at")
-    latest_proof = booking_proofs.first()
+
+    # Fetch proofs separately for better UI organization
+    from payments.models import PaymentProofType, PaymentProofStatus
+    all_proofs = reservation.payment_proofs.all().order_by("-uploaded_at")
+    booking_proofs = [p for p in all_proofs if p.payment_type == PaymentProofType.BOOKING]
+    damage_proofs  = [p for p in all_proofs if p.payment_type == PaymentProofType.DAMAGE]
+    penalty_proofs = [p for p in all_proofs if p.payment_type == PaymentProofType.PENALTY]
+    
+    pending_booking_proofs = [p for p in booking_proofs if p.status == PaymentProofStatus.PENDING]
+    pending_damage_proofs  = [p for p in damage_proofs if p.status == PaymentProofStatus.PENDING]
+    pending_penalty_proofs = [p for p in penalty_proofs if p.status == PaymentProofStatus.PENDING]
+    
+    latest_proof   = booking_proofs[0] if booking_proofs else None
+
+    # ── Build unified payment+proof rows for Bursary receipt review ──────────
+    # Match proofs to payments based on reference, and keep track of matched proofs
+    proof_by_ref = {}
+    for p in all_proofs:
+        if p.transaction_ref:
+            proof_by_ref.setdefault(p.transaction_ref, []).append(p)
+
+    accounted_proofs = set()
+    unified_payments = []
+
+    for pmt in all_payments_qs:
+        matched_proofs = (
+            proof_by_ref.get(pmt.transaction_reference, [])
+            or proof_by_ref.get(pmt.paystack_reference, [])
+        )
+        for mp in matched_proofs:
+            accounted_proofs.add(mp.id)
+
+        if pmt.damage_report_id:
+            label = "Damage Payment"
+            badge_class = "bg-danger"
+            icon = "bi-tools"
+        elif pmt.penalty_id:
+            label = "Penalty Payment"
+            badge_class = "bg-warning text-dark"
+            icon = "bi-exclamation-octagon"
+        else:
+            label = "Hall Booking Payment"
+            badge_class = "bg-primary"
+            icon = "bi-cash-coin"
+            
+        unified_payments.append({
+            "payment":       pmt,
+            "label":         label,
+            "badge_class":   badge_class,
+            "icon":          icon,
+            "proofs":        matched_proofs,
+        })
+
+    # Also include proofs that have no matching Payment object (manual uploads)
+    for proof in all_proofs:
+        if proof.id not in accounted_proofs:
+            if proof.payment_type == PaymentProofType.BOOKING:
+                label, badge_class, icon = "Hall Booking Payment (Manual Upload)", "bg-primary text-white", "bi-cash-coin"
+            elif proof.payment_type == PaymentProofType.DAMAGE:
+                label, badge_class, icon = "Damage Payment (Manual Upload)", "bg-danger text-white", "bi-tools"
+            else:
+                label, badge_class, icon = "Penalty Payment (Manual Upload)", "bg-warning text-dark", "bi-exclamation-octagon"
+            
+            unified_payments.append({
+                "payment":     None,
+                "label":       label,
+                "badge_class": badge_class,
+                "icon":        icon,
+                "proofs":      [proof],
+            })
+            accounted_proofs.add(proof.id)
+
+    # ── Sum ALL paid amounts across payment types for financial summary ───────
+    from decimal import Decimal as D
+    amount_paid_total = sum(
+        (p.amount for p in all_payments_qs if p.status == PaymentStatus.PAID),
+        D("0")
+    )
 
     # Communication thread
     thread, _ = CommunicationThread.objects.get_or_create(reservation=reservation)
@@ -865,7 +980,6 @@ def bursary_payment_review(request, booking_reference: str):
     ).order_by("-timestamp")[:50]
 
     # Financial breakdown for display
-    from decimal import Decimal as D
     hall_price      = (auth.hall_price      if auth else reservation.total_cost) or D("0")
     coupon_discount = (auth.coupon_discount if auth else reservation.discount_amount_applied) or D("0")
     discount_amount = (auth.discount_amount if auth else reservation.discount_value) or D("0")
@@ -873,33 +987,48 @@ def bursary_payment_review(request, booking_reference: str):
     extra_charges   = (auth.extra_charges   if auth else D("0")) or D("0")
     vat_amount      = (auth.vat_amount      if auth else D("0")) or D("0")
     total_amount    = (auth.total_amount    if auth else reservation.total_cost) or D("0")
+    # Use booking payment for the primary receipt, but total_paid covers everything
     amount_paid     = booking_payment.amount if booking_payment else D("0")
     difference      = total_amount - amount_paid
     outstanding     = (auth.outstanding_balance if auth else D("0")) or D("0")
 
+    # Determine if there are outstanding damages or penalties to allow manual confirmation
+    has_outstanding_damages = any(not d.is_paid and not d.is_forgiven for d in reservation.damage_reports.all())
+    has_outstanding_penalties = any(not p.is_paid and not p.is_forgiven for p in reservation.penalties.all())
+
     context = {
-        "reservation":       reservation,
-        "auth":              auth,
-        "booking_payment":   booking_payment,
-        "booking_proofs":    booking_proofs,
-        "latest_proof":      latest_proof,
-        "thread_messages":   thread_messages,
-        "audit_logs":        audit_logs,
-        "BookingCaseStatus": BookingCaseStatus,
-        "PaymentProofStatus": PaymentProofStatus,
-        "PaymentStatus":     PaymentStatus,
+        "reservation":          reservation,
+        "auth":                 auth,
+        "booking_payment":      booking_payment,
+        "booking_proofs":       booking_proofs,
+        "damage_proofs":        damage_proofs,
+        "penalty_proofs":       penalty_proofs,
+        "pending_booking_proofs": pending_booking_proofs,
+        "pending_damage_proofs":  pending_damage_proofs,
+        "pending_penalty_proofs": pending_penalty_proofs,
+        "has_outstanding_damages": has_outstanding_damages,
+        "has_outstanding_penalties": has_outstanding_penalties,
+        "latest_proof":         latest_proof,
+        # Unified list for the new "All Receipts" panel
+        "unified_payments":     unified_payments,
+        "amount_paid_total":    amount_paid_total,
+        "thread_messages":      thread_messages,
+        "audit_logs":           audit_logs,
+        "BookingCaseStatus":    BookingCaseStatus,
+        "PaymentProofStatus":   PaymentProofStatus,
+        "PaymentStatus":        PaymentStatus,
         # Financial summary
-        "hall_price":        hall_price,
-        "coupon_discount":   coupon_discount,
-        "discount_amount":   discount_amount,
-        "security_dep":      security_dep,
-        "extra_charges":     extra_charges,
-        "vat_amount":        vat_amount,
-        "total_amount":      total_amount,
-        "amount_paid":       amount_paid,
-        "difference":        difference,
-        "outstanding":       outstanding,
-        "coupon_code":       (auth.coupon_code if auth else reservation.coupon_code) or "",
+        "hall_price":           hall_price,
+        "coupon_discount":      coupon_discount,
+        "discount_amount":      discount_amount,
+        "security_dep":         security_dep,
+        "extra_charges":        extra_charges,
+        "vat_amount":           vat_amount,
+        "total_amount":         total_amount,
+        "amount_paid":          amount_paid,
+        "difference":           difference,
+        "outstanding":          outstanding,
+        "coupon_code":          (auth.coupon_code if auth else reservation.coupon_code) or "",
     }
     return render(request, "payments/bursary_payment_review.html", context)
 
@@ -1069,4 +1198,109 @@ def coupon_toggle(request, pk):
         create_audit_log(user=request.user, action=f"Coupon {state}: {coupon.code}", model_name="Coupon")
         messages.success(request, f"Coupon '{coupon.code}' {state}.")
     return redirect("payments:coupon_list")
+
+
+
+@login_required
+def damage_receipt_pdf(request, damage_id: int):
+    """
+    Generate and download the official A4 receipt for a Damage Payment.
+    """
+    from reservations.models import DamageReport
+    from payments.models import PaymentStatus, Payment, PaymentProof
+    from payments.receipt_pdf import build_liability_receipt_pdf
+
+    damage = get_object_or_404(DamageReport.objects.select_related("user", "reservation"), pk=damage_id)
+    
+    is_staff_viewer = (
+        can_view_all(request.user)
+        or getattr(request.user, "role", None) in ("VENTURES", "BURSARY", "ADMIN", "STAFF")
+    )
+    if not is_staff_viewer and damage.user != request.user:
+        messages.error(request, "Access denied.")
+        return redirect("reservations:my_reservations")
+        
+    if not damage.is_paid:
+        messages.error(request, "Receipt is only available after payment is confirmed.")
+        return redirect("reservations:detail", booking_reference=damage.reservation.booking_reference if damage.reservation else "home")
+
+    payment = (
+        Payment.objects.filter(damage_report=damage, status=PaymentStatus.PAID)
+        .order_by("-created_at")
+        .first()
+    )
+    proof = (
+        PaymentProof.objects.filter(reservation=damage.reservation, payment_type="DAMAGE")
+        .order_by("-uploaded_at")
+        .first()
+    )
+
+    pdf_bytes = build_liability_receipt_pdf(
+        liability=damage,
+        liability_type="DAMAGE",
+        payment=payment,
+        payment_proof=proof,
+        request=request,
+    )
+    filename = f"LASU_Damage_Receipt_{damage_id}.pdf"
+    response = HttpResponse(pdf_bytes, content_type="application/pdf")
+    response["Content-Disposition"] = f'attachment; filename="{filename}"'
+    create_audit_log(
+        user=request.user,
+        action=f"damage_receipt_downloaded:{damage_id}",
+        model_name="DamageReport",
+    )
+    return response
+
+
+@login_required
+def penalty_receipt_pdf(request, penalty_id: int):
+    """
+    Generate and download the official A4 receipt for a Penalty Payment.
+    """
+    from reservations.models import Penalty
+    from payments.models import PaymentStatus, Payment, PaymentProof
+    from payments.receipt_pdf import build_liability_receipt_pdf
+
+    penalty = get_object_or_404(Penalty.objects.select_related("user", "reservation"), pk=penalty_id)
+    
+    is_staff_viewer = (
+        can_view_all(request.user)
+        or getattr(request.user, "role", None) in ("VENTURES", "BURSARY", "ADMIN", "STAFF")
+    )
+    if not is_staff_viewer and penalty.user != request.user:
+        messages.error(request, "Access denied.")
+        return redirect("reservations:my_reservations")
+        
+    if not penalty.is_paid:
+        messages.error(request, "Receipt is only available after payment is confirmed.")
+        return redirect("reservations:detail", booking_reference=penalty.reservation.booking_reference if penalty.reservation else "home")
+
+    payment = (
+        Payment.objects.filter(penalty=penalty, status=PaymentStatus.PAID)
+        .order_by("-created_at")
+        .first()
+    )
+    proof = (
+        PaymentProof.objects.filter(reservation=penalty.reservation, payment_type="PENALTY")
+        .order_by("-uploaded_at")
+        .first()
+    )
+
+    pdf_bytes = build_liability_receipt_pdf(
+        liability=penalty,
+        liability_type="PENALTY",
+        payment=payment,
+        payment_proof=proof,
+        request=request,
+    )
+    filename = f"LASU_Penalty_Receipt_{penalty_id}.pdf"
+    response = HttpResponse(pdf_bytes, content_type="application/pdf")
+    response["Content-Disposition"] = f'attachment; filename="{filename}"'
+    create_audit_log(
+        user=request.user,
+        action=f"penalty_receipt_downloaded:{penalty_id}",
+        model_name="Penalty",
+    )
+    return response
 

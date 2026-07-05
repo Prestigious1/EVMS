@@ -344,9 +344,7 @@ class WorkflowActionEngine:
                              "Damage Payment Verified", "credit-card", "danger"))
 
             if status == _S.BOOKING_APPROVED:
-                ap.append(_a("download_permit", "Download Booking Permit",
-                             "Download your official booking approval permit document.",
-                             "N/A", "file-earmark-arrow-down", "success"))
+                pass # Document downloads are handled directly in the UI template
 
         # =====================================================================
         # ADMIN ACTIONS

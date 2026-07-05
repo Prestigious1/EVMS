@@ -1,0 +1,281 @@
+{% extends "reports/bi_base.html" %}
+{% load static %}
+
+{% block title %}Admin Dashboard{% endblock %}
+{% block nav_reports_admin_dashboard %}active{% endblock %}
+
+{% block bi_title %}Admin Overview{% endblock %}
+{% block bi_subtitle %}University-wide System Analytics & Key Performance Indicators{% endblock %}
+{% block bi_icon %}bi-shield-lock{% endblock %}
+
+{% block bi_filters %}{% endblock %}
+
+{% block bi_content %}
+<div class="row g-3 mb-4">
+  <!-- Bookings Section -->
+  <div class="col-12 col-md-4 col-xl-2">
+    <div class="kpi-card">
+      <div class="kpi-icon text-primary bg-primary bg-opacity-10"><i class="bi bi-calendar-check"></i></div>
+      <div class="kpi-value">{{ total_bookings }}</div>
+      <div class="kpi-label">Total Bookings</div>
+    </div>
+  </div>
+  <div class="col-12 col-md-4 col-xl-2">
+    <div class="kpi-card">
+      <div class="kpi-icon text-info bg-info bg-opacity-10"><i class="bi bi-hourglass-split"></i></div>
+      <div class="kpi-value">{{ pending_reviews }}</div>
+      <div class="kpi-label">Pending Reviews</div>
+    </div>
+  </div>
+  <div class="col-12 col-md-4 col-xl-2">
+    <div class="kpi-card">
+      <div class="kpi-icon text-success bg-success bg-opacity-10"><i class="bi bi-check-circle"></i></div>
+      <div class="kpi-value">{{ completed_bookings }}</div>
+      <div class="kpi-label">Completed</div>
+    </div>
+  </div>
+  
+  <!-- Financial Section -->
+  <div class="col-12 col-md-6 col-xl-3">
+    <div class="kpi-card">
+      <div class="kpi-icon text-warning bg-warning bg-opacity-10"><i class="bi bi-cash-stack"></i></div>
+      <div class="kpi-value">₦{{ revenue_month|floatformat:0 }}</div>
+      <div class="kpi-label">Revenue (This Month)</div>
+    </div>
+  </div>
+  <div class="col-12 col-md-6 col-xl-3">
+    <div class="kpi-card">
+      <div class="kpi-icon text-warning bg-warning bg-opacity-10"><i class="bi bi-bank"></i></div>
+      <div class="kpi-value">₦{{ revenue_year|floatformat:0 }}</div>
+      <div class="kpi-label">Revenue (This Year)</div>
+    </div>
+  </div>
+</div>
+
+<div class="row g-4 mb-4">
+  <div class="col-12 col-lg-8">
+    <div class="analytics-card">
+      <h6 class="text-uppercase text-muted fw-bold mb-4">Booking Activity Trend (Current Year)</h6>
+      <div class="chart-container">
+        <canvas id="trendChart"></canvas>
+      </div>
+    </div>
+  </div>
+  <div class="col-12 col-lg-4">
+    <div class="analytics-card">
+      <h6 class="text-uppercase text-muted fw-bold mb-4">Booking Status Distribution</h6>
+      <div class="chart-container">
+        <canvas id="statusChart"></canvas>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="row g-4 mb-4">
+  <div class="col-12 col-lg-4">
+    <div class="analytics-card">
+      <h6 class="text-uppercase text-muted fw-bold mb-4">Hall Utilisation (Top 8)</h6>
+      <div class="chart-container-sm">
+        <canvas id="hallChart"></canvas>
+      </div>
+    </div>
+  </div>
+  <div class="col-12 col-lg-4">
+    <div class="analytics-card">
+      <h6 class="text-uppercase text-muted fw-bold mb-4">Payment Methods</h6>
+      <div class="chart-container-sm">
+        <canvas id="payChart"></canvas>
+      </div>
+    </div>
+  </div>
+  <div class="col-12 col-lg-4">
+    <div class="analytics-card">
+      <h6 class="text-uppercase text-muted fw-bold mb-4">Event Purposes</h6>
+      <div class="chart-container-sm">
+        <canvas id="purposeChart"></canvas>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="row g-4">
+  <div class="col-12 col-lg-6">
+    <div class="analytics-card">
+      <h6 class="text-uppercase text-muted fw-bold mb-4">Pending System Actions</h6>
+      <ul class="list-group list-group-flush bg-transparent">
+        <li class="list-group-item bg-transparent d-flex justify-content-between align-items-center">
+          Bursary Verifications
+          <span class="badge bg-warning rounded-pill">{{ pending_bursary }}</span>
+        </li>
+        <li class="list-group-item bg-transparent d-flex justify-content-between align-items-center">
+          Post-Event Inspections
+          <span class="badge bg-info rounded-pill">{{ pending_inspection }}</span>
+        </li>
+        <li class="list-group-item bg-transparent d-flex justify-content-between align-items-center">
+          Damage Payment Verifications
+          <span class="badge bg-danger rounded-pill">{{ pending_damage_payment }}</span>
+        </li>
+        <li class="list-group-item bg-transparent d-flex justify-content-between align-items-center">
+          Final Approvals Awaiting
+          <span class="badge bg-success rounded-pill">{{ final_approval_pending }}</span>
+        </li>
+      </ul>
+    </div>
+  </div>
+  <div class="col-12 col-lg-6">
+    <div class="analytics-card overflow-hidden">
+      <h6 class="text-uppercase text-muted fw-bold mb-4">Recent Audit Activity</h6>
+      <div class="table-responsive">
+        <table class="table table-borderless bi-table mb-0">
+          <thead>
+            <tr>
+              <th>Time</th>
+              <th>User</th>
+              <th>Action</th>
+              <th>Module</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for log in recent_audit %}
+            <tr>
+              <td class="text-nowrap text-muted">{{ log.timestamp|date:"H:i" }}</td>
+              <td>{{ log.user.email|default:"System" }}</td>
+              <td>{{ log.action|truncatechars:30 }}</td>
+              <td><span class="badge bg-secondary bg-opacity-25 text-body">{{ log.affected_module }}</span></td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="4" class="text-center text-muted">No recent activity</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block bi_scripts %}
+<script>
+document.addEventListener("DOMContentLoaded", function() {
+  const c = getThemeColors();
+  
+  // 1. Trend Chart (Line)
+  const ctxTrend = document.getElementById('trendChart');
+  if(ctxTrend) {
+    new Chart(ctxTrend, {
+      type: 'line',
+      data: {
+        labels: {{ booking_month_labels|safe }},
+        datasets: [{
+          label: 'Bookings',
+          data: {{ booking_month_counts|safe }},
+          borderColor: '#60a5fa',
+          backgroundColor: 'rgba(96,165,250,0.1)',
+          borderWidth: 2,
+          tension: 0.4,
+          fill: true
+        }]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: {
+          x: { grid: { display: false } },
+          y: { grid: { color: c.gridColor }, beginAtZero: true }
+        }
+      }
+    });
+  }
+
+  // 2. Status Chart (Doughnut)
+  const ctxStatus = document.getElementById('statusChart');
+  if(ctxStatus) {
+    new Chart(ctxStatus, {
+      type: 'doughnut',
+      data: {
+        labels: {{ case_labels|safe }},
+        datasets: [{
+          data: {{ case_counts|safe }},
+          backgroundColor: ['#4ade80', '#fbbf24', '#f87171', '#60a5fa', '#a78bfa', '#94a3b8'],
+          borderWidth: 0
+        }]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { position: 'right', labels: { boxWidth: 10, color: c.textColor } } },
+        cutout: '75%'
+      }
+    });
+  }
+  
+  // 3. Hall Chart (Bar)
+  const ctxHall = document.getElementById('hallChart');
+  if(ctxHall) {
+    new Chart(ctxHall, {
+      type: 'bar',
+      data: {
+        labels: {{ hall_labels|safe }},
+        datasets: [{
+          data: {{ hall_counts|safe }},
+          backgroundColor: '#818cf8',
+          borderRadius: 4
+        }]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: {
+          x: { grid: { display: false }, ticks: { display: false } }, // Hide x-axis labels to save space
+          y: { grid: { color: c.gridColor }, beginAtZero: true }
+        }
+      }
+    });
+  }
+  
+  // 4. Pay Chart (Pie)
+  const ctxPay = document.getElementById('payChart');
+  if(ctxPay) {
+    new Chart(ctxPay, {
+      type: 'pie',
+      data: {
+        labels: {{ pay_method_labels|safe }},
+        datasets: [{
+          data: {{ pay_method_counts|safe }},
+          backgroundColor: ['#60a5fa', '#facc15', '#4ade80', '#94a3b8'],
+          borderWidth: 0
+        }]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, color: c.textColor } } }
+      }
+    });
+  }
+  
+  // 5. Purpose Chart (Bar - Horizontal)
+  const ctxPurpose = document.getElementById('purposeChart');
+  if(ctxPurpose) {
+    new Chart(ctxPurpose, {
+      type: 'bar',
+      data: {
+        labels: {{ purpose_labels|safe }},
+        datasets: [{
+          data: {{ purpose_counts|safe }},
+          backgroundColor: '#34d399',
+          borderRadius: 4
+        }]
+      },
+      options: {
+        indexAxis: 'y',
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: {
+          x: { grid: { color: c.gridColor }, beginAtZero: true },
+          y: { grid: { display: false } }
+        }
+      }
+    });
+  }
+});
+</script>
+{% endblock %}

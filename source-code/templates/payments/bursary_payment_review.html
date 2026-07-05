@@ -231,89 +231,171 @@
         </div>
       </div>
 
-      {# ── Payment Evidence (Uploaded Files) ── #}
+      {# ── All Payment Receipts (Unified) ── #}
       <div class="card shadow-sm border-0 mb-4">
-        <div class="card-header bg-body border-bottom py-3">
-          <h6 class="mb-0"><i class="bi bi-paperclip me-1"></i>Payment Evidence</h6>
+        <div class="card-header bg-body border-bottom py-3 d-flex justify-content-between align-items-center">
+          <h6 class="mb-0"><i class="bi bi-receipt-cutoff me-1 text-success"></i>All Payment Receipts</h6>
+          <span class="badge bg-secondary rounded-pill">{{ unified_payments|length }} record{% if unified_payments|length != 1 %}s{% endif %}</span>
         </div>
         <div class="card-body p-3">
-          {% if booking_proofs %}
-            {% for proof in booking_proofs %}
-            <div class="d-flex align-items-start gap-3 p-3 mb-2 border rounded {% if proof.status == 'VERIFIED' %}border-success bg-success bg-opacity-10{% elif proof.status == 'REJECTED' %}border-danger bg-danger bg-opacity-10{% else %}border-warning{% endif %}">
-              <div class="flex-shrink-0">
-                <i class="bi bi-file-earmark-image fs-3 {% if proof.status == 'VERIFIED' %}text-success{% elif proof.status == 'REJECTED' %}text-danger{% else %}text-warning{% endif %}"></i>
+          {% if unified_payments %}
+
+            {# ── Total Paid Summary Row ── #}
+            <div class="d-flex justify-content-between align-items-center p-2 mb-3 rounded bg-success bg-opacity-10 border border-success">
+              <div class="fw-semibold text-success small">
+                <i class="bi bi-check2-circle me-1"></i>Total Paid (All Types)
               </div>
-              <div class="flex-grow-1 small">
-                <div class="fw-semibold">{{ proof.get_status_display }}</div>
-                <div class="text-dark opacity-75">Reference: <code>{{ proof.transaction_ref|default:"—" }}</code></div>
-                <div class="text-dark opacity-75">Amount Claimed: <strong>₦{{ proof.amount_claimed|floatformat:2 }}</strong></div>
-                <div class="text-dark opacity-75">Uploaded: {{ proof.uploaded_at|date:"d M Y H:i" }}</div>
-                {% if proof.bursary_notes %}
-                <div class="text-muted">Bursary Notes: {{ proof.bursary_notes }}</div>
+              <div class="fw-bold text-success">₦{{ amount_paid_total|floatformat:2 }}</div>
+            </div>
+
+            {% for row in unified_payments %}
+            {% with pmt=row.payment proofs=row.proofs %}
+            <div class="border rounded mb-3 overflow-hidden">
+              {# Row Header #}
+              <div class="d-flex align-items-center gap-2 px-3 py-2 bg-body-tertiary border-bottom flex-wrap">
+                <i class="bi {{ row.icon }} text-secondary"></i>
+                <span class="badge {{ row.badge_class }} me-1">{{ row.label }}</span>
+                {% if pmt %}
+                  <span class="badge {% if pmt.status == 'PAID' %}bg-success{% elif pmt.status == 'FAILED' %}bg-danger{% else %}bg-secondary{% endif %} ms-auto">
+                    {{ pmt.get_status_display }}
+                  </span>
                 {% endif %}
               </div>
-              {% if proof.receipt_file %}
-              <div class="flex-shrink-0">
-                <a href="{{ proof.receipt_file.url }}" class="btn btn-sm btn-outline-primary" target="_blank">
-                  <i class="bi bi-eye me-1"></i>View
-                </a>
+
+              {# Payment Details #}
+              <div class="px-3 py-2 small">
+                {% if pmt %}
+                <div class="row g-1 mb-2">
+                  <div class="col-5 text-muted">Amount</div>
+                  <div class="col-7 fw-semibold">₦{{ pmt.amount|floatformat:2 }}</div>
+                  <div class="col-5 text-muted">Method</div>
+                  <div class="col-7">{{ pmt.get_payment_method_display }}</div>
+                  <div class="col-5 text-muted">Reference</div>
+                  <div class="col-7 font-monospace" style="word-break:break-all;">
+                    {{ pmt.transaction_reference|default:pmt.paystack_reference|default:"—" }}
+                  </div>
+                  <div class="col-5 text-muted">Date</div>
+                  <div class="col-7">{{ pmt.created_at|date:"d M Y H:i" }}</div>
+                  {% if pmt.damage_report %}
+                  <div class="col-5 text-muted">Damage Ref</div>
+                  <div class="col-7">#{{ pmt.damage_report.id }}</div>
+                  {% endif %}
+                  {% if pmt.penalty %}
+                  <div class="col-5 text-muted">Penalty</div>
+                  <div class="col-7">{{ pmt.penalty.title }}</div>
+                  {% endif %}
+                </div>
+                {% endif %}
+
+                {# Proofs attached to this payment #}
+                {% if proofs %}
+                  {% for proof in proofs %}
+                  <div class="d-flex align-items-start gap-2 p-2 mt-1 rounded
+                    {% if proof.status == 'VERIFIED' %}bg-success bg-opacity-10 border border-success
+                    {% elif proof.status == 'REJECTED' %}bg-danger bg-opacity-10 border border-danger
+                    {% else %}bg-warning bg-opacity-10 border border-warning{% endif %}">
+                    <i class="bi bi-file-earmark-image fs-5
+                      {% if proof.status == 'VERIFIED' %}text-success
+                      {% elif proof.status == 'REJECTED' %}text-danger
+                      {% else %}text-warning{% endif %}"></i>
+                    <div class="flex-grow-1">
+                      <div class="fw-semibold">{{ proof.get_status_display }}</div>
+                      <div class="text-muted" style="font-size:0.78rem;">
+                        Amount Claimed: <strong>₦{{ proof.amount_claimed|floatformat:2 }}</strong>
+                        &nbsp;|&nbsp;
+                        Ref: <code>{{ proof.transaction_ref|default:"—" }}</code>
+                      </div>
+                      <div class="text-muted" style="font-size:0.75rem;">Uploaded: {{ proof.uploaded_at|date:"d M Y H:i" }}</div>
+                      {% if proof.bursary_notes %}
+                      <div class="text-muted mt-1" style="font-size:0.75rem;">Notes: {{ proof.bursary_notes }}</div>
+                      {% endif %}
+                      {% if proof.verified_by %}
+                      <div class="text-muted" style="font-size:0.75rem;">Verified by: {{ proof.verified_by.get_full_name|default:proof.verified_by.email }}</div>
+                      {% endif %}
+                    </div>
+                    {% if proof.receipt_file %}
+                    <a href="{{ proof.receipt_file.url }}" class="btn btn-sm btn-outline-primary py-0 flex-shrink-0" target="_blank">
+                      <i class="bi bi-eye me-1"></i>View
+                    </a>
+                    {% endif %}
+                  </div>
+                  {% endfor %}
+                {% else %}
+                  <div class="text-muted" style="font-size:0.78rem;">
+                    <i class="bi bi-info-circle me-1"></i>
+                    {% if pmt and pmt.status == 'PAID' %}
+                      Online payment confirmed — no manual proof uploaded.
+                    {% else %}
+                      No receipt evidence uploaded yet.
+                    {% endif %}
+                  </div>
+                {% endif %}
               </div>
-              {% endif %}
             </div>
+            {% endwith %}
             {% endfor %}
+
           {% else %}
             <div class="text-muted small py-3 text-center">
-              <i class="bi bi-info-circle me-1"></i>No uploaded payment evidence on file.
+              <i class="bi bi-info-circle me-1"></i>No payment records found for this booking.
             </div>
           {% endif %}
         </div>
-      </div>
+      </div>{# /all-receipts-card #}
 
-    </div>
+    </div>{# /col-lg-7 #}
 
     {# ══════════════ RIGHT: Actions, Timeline, Audit ══════════════ #}
     <div class="col-lg-5">
 
-      {# ── Bursary Action Panel ── #}
-      {% if reservation.case_status == BookingCaseStatus.UNDER_BURSARY_VERIFICATION %}
+      {# ── Hall Booking Payment Action Panel ── #}
+      {% if pending_booking_proofs or reservation.case_status == BookingCaseStatus.UNDER_BURSARY_VERIFICATION %}
       <div class="card shadow-sm border-0 mb-4 border-start border-warning border-4">
         <div class="card-header bg-warning bg-opacity-10 border-bottom">
-          <h6 class="mb-0 text-warning-emphasis"><i class="bi bi-shield-check me-1"></i>Bursary Actions</h6>
+          <h6 class="mb-0 text-warning-emphasis"><i class="bi bi-receipt me-1"></i>Hall Booking Payment Verification</h6>
         </div>
         <div class="card-body p-3">
           <p class="small text-muted mb-3">
-            Review the payment evidence and financial breakdown above, then take one of the following actions.
+            Review the uploaded booking payment evidence above, then approve or reject.
           </p>
 
-          {# Approve #}
-          <form method="post" action="{% url 'reservations:bursary_action' reservation.booking_reference %}" class="mb-3">
-            {% csrf_token %}
-            <input type="hidden" name="action" value="verify_payment">
-            <div class="mb-2">
-              <label class="form-label small fw-semibold">Verification Notes (for Approve)</label>
-              <textarea name="notes" rows="2" class="form-control form-control-sm" placeholder="e.g., Payment confirmed against bank records. Amount matches invoice."></textarea>
-            </div>
-            <button type="submit" class="btn btn-success w-100 fw-semibold"
-              onclick="return confirm('Approve this payment? This will move the booking to AWAITING_FINAL_APPROVAL.')">
-              <i class="bi bi-check-circle me-1"></i>Approve Payment
-            </button>
-          </form>
+          {# Only show Booking Payment buttons if there are pending proofs OR case is still in verification stage #}
+          {% if pending_booking_proofs or reservation.case_status == BookingCaseStatus.UNDER_BURSARY_VERIFICATION or reservation.case_status == BookingCaseStatus.PAYMENT_SUBMITTED %}
+            {# Approve #}
+            <form method="post" action="{% url 'reservations:bursary_action' reservation.booking_reference %}" class="mb-3">
+              {% csrf_token %}
+              <input type="hidden" name="action" value="verify_payment">
+              <div class="mb-2">
+                <label class="form-label small fw-semibold">Verification Notes</label>
+                <textarea name="notes" rows="2" class="form-control form-control-sm" placeholder="e.g., Payment confirmed against bank records. Amount matches invoice."></textarea>
+              </div>
+              <button type="submit" class="btn btn-success w-100 fw-semibold"
+                onclick="return confirm('Approve this booking payment? This will move the booking to AWAITING_FINAL_APPROVAL.')">
+                <i class="bi bi-check-circle me-1"></i>Approve Booking Payment
+              </button>
+            </form>
 
-          <hr>
+            <hr>
 
-          {# Reject #}
-          <form method="post" action="{% url 'reservations:bursary_action' reservation.booking_reference %}" class="mb-3">
-            {% csrf_token %}
-            <input type="hidden" name="action" value="reject_payment">
-            <div class="mb-2">
-              <label class="form-label small fw-semibold text-danger">Rejection Reason (required)</label>
-              <textarea name="notes" rows="2" class="form-control form-control-sm border-danger" placeholder="Reason for rejection..." required></textarea>
+            {# Reject #}
+            <form method="post" action="{% url 'reservations:bursary_action' reservation.booking_reference %}" class="mb-3">
+              {% csrf_token %}
+              <input type="hidden" name="action" value="reject_payment">
+              <div class="mb-2">
+                <label class="form-label small fw-semibold text-danger">Rejection Reason (required)</label>
+                <textarea name="notes" rows="2" class="form-control form-control-sm border-danger" placeholder="Reason for rejection..." required></textarea>
+              </div>
+              <button type="submit" class="btn btn-danger w-100 fw-semibold"
+                onclick="return confirm('Reject this payment? The applicant will be required to re-upload.')">
+                <i class="bi bi-x-circle me-1"></i>Reject Booking Payment
+              </button>
+            </form>
+          {% else %}
+            <div class="alert alert-success py-2 small mb-0">
+              <i class="bi bi-check-circle-fill me-1"></i>
+              <strong>Booking payment processed.</strong>
             </div>
-            <button type="submit" class="btn btn-danger w-100 fw-semibold"
-              onclick="return confirm('Reject this payment? The applicant will be required to re-upload.')">
-              <i class="bi bi-x-circle me-1"></i>Reject Payment
-            </button>
-          </form>
+          {% endif %}
 
           <hr>
 
@@ -331,12 +413,175 @@
           </form>
         </div>
       </div>
-      {% else %}
+      {% endif %}
+
+      {# ── Damage Payment Action Panel ── #}
+      {% if reservation.damage_reports.all %}
+      <div class="card shadow-sm border-0 mb-4 border-start border-danger border-4">
+        <div class="card-header bg-danger bg-opacity-10 border-bottom">
+          <h6 class="mb-0 text-danger-emphasis"><i class="bi bi-tools me-1"></i>Damage Payment Verification</h6>
+        </div>
+        <div class="card-body p-3">
+          <p class="small text-muted mb-3">
+            Review the damage payment evidence and confirm or reject.
+          </p>
+
+          {% if damage_proofs %}
+            <div class="mb-3">
+              {% for proof in damage_proofs %}
+              <div class="p-2 mb-2 border rounded small {% if proof.status == 'VERIFIED' %}border-success bg-success bg-opacity-10{% elif proof.status == 'REJECTED' %}border-danger bg-danger bg-opacity-10{% else %}border-warning{% endif %}">
+                <div class="fw-semibold">{{ proof.get_status_display }}</div>
+                <div>Amount: <strong>₦{{ proof.amount_claimed|floatformat:2 }}</strong></div>
+                <div>Ref: <code>{{ proof.transaction_ref|default:"—" }}</code></div>
+                <div class="text-muted">Uploaded: {{ proof.uploaded_at|date:"d M Y H:i" }}</div>
+                {% if proof.receipt_file %}
+                <div class="mt-1">
+                  <a href="{{ proof.receipt_file.url }}" class="btn btn-sm btn-outline-primary py-0" target="_blank"><i class="bi bi-eye me-1"></i>View Proof</a>
+                </div>
+                {% endif %}
+              </div>
+              {% endfor %}
+            </div>
+          {% endif %}
+          
+          {% for dmg in reservation.damage_reports.all %}
+            {% if dmg.is_paid %}
+            <div class="mb-3">
+              <a href="{% url 'payments:damage_receipt_pdf' dmg.id %}" class="btn btn-sm btn-outline-success w-100"><i class="bi bi-download me-1"></i>Download Official Receipt</a>
+            </div>
+            {% endif %}
+          {% endfor %}
+
+          {% if pending_damage_proofs or has_outstanding_damages %}
+          <form method="post" action="{% url 'reservations:bursary_action' reservation.booking_reference %}" class="mb-3">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="verify_damage_payment">
+            <div class="mb-2">
+              <label class="form-label small fw-semibold">Verification Notes</label>
+              <textarea name="notes" rows="2" class="form-control form-control-sm" placeholder="Confirm damage payment amount and reference."></textarea>
+            </div>
+            <button type="submit" class="btn btn-success w-100 fw-semibold"
+              onclick="return confirm('Confirm damage payment? This will mark the damage as paid and release the user booking restriction.')">
+              <i class="bi bi-check-circle me-1"></i>Confirm Damage Payment
+            </button>
+          </form>
+
+          <hr>
+
+          <form method="post" action="{% url 'reservations:bursary_action' reservation.booking_reference %}">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="reject_damage_payment">
+            <div class="mb-2">
+              <label class="form-label small fw-semibold text-danger">Rejection Reason (required)</label>
+              <textarea name="notes" rows="2" class="form-control form-control-sm border-danger" placeholder="Reason for rejecting damage payment proof..." required></textarea>
+            </div>
+            <button type="submit" class="btn btn-danger w-100 fw-semibold"
+              onclick="return confirm('Reject this damage payment proof? The applicant will be required to re-upload.')">
+              <i class="bi bi-x-circle me-1"></i>Reject Damage Payment
+            </button>
+          </form>
+          {% else %}
+            <div class="alert alert-success py-2 small mb-0">
+              <i class="bi bi-check-circle-fill me-1"></i>
+              <strong>Damage payment processed.</strong>
+            </div>
+          {% endif %}
+        </div>
+      </div>
+      {% endif %}
+
+      {# ── Penalty Payment Action Panel ── #}
+      {% if reservation.penalties.all %}
+      <div class="card shadow-sm border-0 mb-4 border-start border-warning border-4">
+        <div class="card-header bg-warning bg-opacity-10 border-bottom">
+          <h6 class="mb-0 text-warning-emphasis"><i class="bi bi-exclamation-octagon me-1"></i>Penalty Payment Verification</h6>
+        </div>
+        <div class="card-body p-3">
+          {# Show outstanding penalties #}
+          <div class="mb-3">
+            {% for pen in reservation.penalties.all %}
+            <div class="d-flex justify-content-between align-items-center small p-2 bg-body-tertiary rounded mb-1">
+              <span>{{ pen.title }} — <strong>₦{{ pen.amount }}</strong></span>
+              <span class="badge {% if pen.is_forgiven %}bg-secondary{% elif pen.is_paid %}bg-success{% else %}bg-danger{% endif %}">
+                {% if pen.is_forgiven %}Forgiven{% elif pen.is_paid %}Paid{% else %}Outstanding{% endif %}
+              </span>
+            </div>
+            {% endfor %}
+          </div>
+
+          <p class="small text-muted mb-3">
+            Review the penalty payment evidence and confirm or reject.
+          </p>
+
+          {% if penalty_proofs %}
+            <div class="mb-3">
+              {% for proof in penalty_proofs %}
+              <div class="p-2 mb-2 border rounded small {% if proof.status == 'VERIFIED' %}border-success bg-success bg-opacity-10{% elif proof.status == 'REJECTED' %}border-danger bg-danger bg-opacity-10{% else %}border-warning{% endif %}">
+                <div class="fw-semibold">{{ proof.get_status_display }}</div>
+                <div>Amount: <strong>₦{{ proof.amount_claimed|floatformat:2 }}</strong></div>
+                <div>Ref: <code>{{ proof.transaction_ref|default:"—" }}</code></div>
+                <div class="text-muted">Uploaded: {{ proof.uploaded_at|date:"d M Y H:i" }}</div>
+                {% if proof.receipt_file %}
+                <div class="mt-1">
+                  <a href="{{ proof.receipt_file.url }}" class="btn btn-sm btn-outline-primary py-0" target="_blank"><i class="bi bi-eye me-1"></i>View Proof</a>
+                </div>
+                {% endif %}
+              </div>
+              {% endfor %}
+            </div>
+          {% endif %}
+          
+          {% for pen in reservation.penalties.all %}
+            {% if pen.is_paid %}
+            <div class="mb-2">
+              <a href="{% url 'payments:penalty_receipt_pdf' pen.id %}" class="btn btn-sm btn-outline-success w-100"><i class="bi bi-download me-1"></i>Download Receipt ({{ pen.title }})</a>
+            </div>
+            {% endif %}
+          {% endfor %}
+
+          {% if pending_penalty_proofs or has_outstanding_penalties %}
+          <form method="post" action="{% url 'reservations:bursary_action' reservation.booking_reference %}" class="mb-3">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="verify_penalty_payment">
+            <div class="mb-2">
+              <label class="form-label small fw-semibold">Verification Notes</label>
+              <textarea name="notes" rows="2" class="form-control form-control-sm" placeholder="e.g., Penalty payment confirmed. Amount matches outstanding balance."></textarea>
+            </div>
+            <button type="submit" class="btn btn-success w-100 fw-semibold"
+              onclick="return confirm('Confirm penalty payment? This will mark the penalties as paid and release the user booking restriction.')">
+              <i class="bi bi-check-circle me-1"></i>Confirm Penalty Payment
+            </button>
+          </form>
+
+          <hr>
+
+          <form method="post" action="{% url 'reservations:bursary_action' reservation.booking_reference %}">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="reject_penalty_payment">
+            <div class="mb-2">
+              <label class="form-label small fw-semibold text-danger">Rejection Reason (required)</label>
+              <textarea name="notes" rows="2" class="form-control form-control-sm border-danger" placeholder="Reason for rejecting penalty payment proof..." required></textarea>
+            </div>
+            <button type="submit" class="btn btn-danger w-100 fw-semibold"
+              onclick="return confirm('Reject this penalty payment proof? The applicant will be required to re-upload.')">
+              <i class="bi bi-x-circle me-1"></i>Reject Penalty Payment
+            </button>
+          </form>
+          {% else %}
+            <div class="alert alert-success py-2 small mb-0">
+              <i class="bi bi-check-circle-fill me-1"></i>
+              <strong>Penalty payment processed.</strong>
+            </div>
+          {% endif %}
+        </div>
+      </div>
+      {% endif %}
+
+      {% if reservation.case_status != BookingCaseStatus.UNDER_BURSARY_VERIFICATION and reservation.case_status != BookingCaseStatus.UNDER_DAMAGE_PAYMENT_VERIFICATION and not reservation.penalties.all and not booking_proofs and not damage_proofs and not penalty_proofs %}
       <div class="card shadow-sm border-0 mb-4">
         <div class="card-body p-3 text-center text-muted small">
           <i class="bi bi-info-circle fs-3 d-block mb-2"></i>
-          Bursary verification actions are only available when the booking is
-          <strong>Under Bursary Verification</strong>.
+          No active Bursary verification is required at the current status.
           <div class="mt-2">
             Current status:
             <span class="badge bg-secondary">{{ reservation.get_case_status_display_label }}</span>

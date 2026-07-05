@@ -1,0 +1,98 @@
+{% extends "reports/bi_base.html" %}
+{% load static %}
+
+{% block title %}Penalty Report{% endblock %}
+{% block nav_reports_penalties %}active{% endblock %}
+
+{% block bi_title %}Penalty Report{% endblock %}
+{% block bi_subtitle %}Analyze issued penalties and payment recovery{% endblock %}
+{% block bi_icon %}bi-exclamation-triangle{% endblock %}
+
+{% block bi_custom_filters %}
+<div class="col-12 col-md-2">
+  <label class="form-label small text-muted mb-1">Status</label>
+  <select name="status" class="form-select form-select-sm">
+    <option value="">All Statuses</option>
+    <option value="ISSUED" {% if request.GET.status == 'ISSUED' %}selected{% endif %}>Issued</option>
+    <option value="PAID" {% if request.GET.status == 'PAID' %}selected{% endif %}>Paid</option>
+    <option value="APPEALED" {% if request.GET.status == 'APPEALED' %}selected{% endif %}>Appealed</option>
+  </select>
+</div>
+{% endblock %}
+
+{% block bi_content %}
+<div class="row g-3 mb-4">
+  <div class="col-12 col-md-4">
+    <div class="kpi-card border-danger">
+      <div class="kpi-value">{{ total_penalties }}</div>
+      <div class="kpi-label">Total Penalties</div>
+    </div>
+  </div>
+  <div class="col-12 col-md-4">
+    <div class="kpi-card border-warning">
+      <div class="kpi-value">₦{{ total_amount|floatformat:0 }}</div>
+      <div class="kpi-label">Total Amount Issued</div>
+    </div>
+  </div>
+  <div class="col-12 col-md-4">
+    <div class="kpi-card border-success">
+      <div class="kpi-value">₦{{ paid_amount|floatformat:0 }}</div>
+      <div class="kpi-label">Amount Recovered</div>
+    </div>
+  </div>
+</div>
+
+<div class="analytics-card overflow-hidden">
+  <div class="table-responsive">
+    <table class="table table-borderless bi-table mb-0">
+      <thead>
+        <tr>
+          <th>Date Issued</th>
+          <th>Reference</th>
+          <th>Applicant</th>
+          <th>Reason</th>
+          <th>Amount (₦)</th>
+          <th>Status</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for penalty in page_obj %}
+        <tr>
+          <td class="text-nowrap">{{ penalty.issued_at|date:"M d, Y" }}</td>
+          <td class="fw-bold">{{ penalty.reservation.booking_reference }}</td>
+          <td>{{ penalty.reservation.user.email }}</td>
+          <td>{{ penalty.reason|truncatechars:40 }}</td>
+          <td class="fw-bold text-end">₦{{ penalty.amount|floatformat:0 }}</td>
+          <td>
+            <span class="badge 
+              {% if penalty.status == 'PAID' %}bg-success
+              {% elif penalty.status == 'ISSUED' %}bg-danger
+              {% else %}bg-warning{% endif %}">
+              {{ penalty.status }}
+            </span>
+          </td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="6" class="text-center py-4 text-muted">No penalties found.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  
+  {% if page_obj.has_other_pages %}
+  <div class="mt-4 d-flex justify-content-end">
+    <nav aria-label="Page navigation">
+      <ul class="pagination pagination-sm">
+        {% if page_obj.has_previous %}
+        <li class="page-item"><a class="page-link" href="?{% for key, value in request.GET.items %}{% if key != 'page' %}{{ key }}={{ value }}&{% endif %}{% endfor %}page={{ page_obj.previous_page_number }}">Prev</a></li>
+        {% endif %}
+        <li class="page-item active"><span class="page-link">{{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span></li>
+        {% if page_obj.has_next %}
+        <li class="page-item"><a class="page-link" href="?{% for key, value in request.GET.items %}{% if key != 'page' %}{{ key }}={{ value }}&{% endif %}{% endfor %}page={{ page_obj.next_page_number }}">Next</a></li>
+        {% endif %}
+      </ul>
+    </nav>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

@@ -1,0 +1,110 @@
+{% extends "reports/bi_base.html" %}
+{% load static %}
+
+{% block title %}Booking Report{% endblock %}
+{% block nav_reports_bookings %}active{% endblock %}
+
+{% block bi_title %}Booking Report{% endblock %}
+{% block bi_subtitle %}Analyze reservations by status, hall, and period{% endblock %}
+{% block bi_icon %}bi-calendar-check{% endblock %}
+
+{% block bi_custom_filters %}
+<!-- Status Filter -->
+<div class="col-12 col-md-2">
+  <label class="form-label small text-muted mb-1">Status</label>
+  <select name="case_status" class="form-select form-select-sm">
+    <option value="">All Statuses</option>
+    {% for val, label in BookingCaseStatus.choices %}
+    <option value="{{ val }}" {% if request.GET.case_status == val %}selected{% endif %}>{{ label }}</option>
+    {% endfor %}
+  </select>
+</div>
+
+<!-- Hall Filter -->
+<div class="col-12 col-md-2">
+  <label class="form-label small text-muted mb-1">Hall</label>
+  <select name="hall" class="form-select form-select-sm">
+    <option value="">All Halls</option>
+    {% for hall in halls %}
+    <option value="{{ hall.id }}" {% if request.GET.hall == hall.id|stringformat:"s" %}selected{% endif %}>{{ hall.name }}</option>
+    {% endfor %}
+  </select>
+</div>
+{% endblock %}
+
+{% block bi_content %}
+<div class="row g-3 mb-4">
+  <div class="col-12 col-md-4">
+    <div class="kpi-card border-primary">
+      <div class="kpi-value">{{ total_count }}</div>
+      <div class="kpi-label">Total Bookings</div>
+    </div>
+  </div>
+  <div class="col-12 col-md-4">
+    <div class="kpi-card border-success">
+      <div class="kpi-value">₦{{ total_revenue|floatformat:0 }}</div>
+      <div class="kpi-label">Total Booking Value</div>
+    </div>
+  </div>
+  <div class="col-12 col-md-4">
+    <div class="kpi-card border-info">
+      <div class="kpi-value">₦{{ avg_cost|floatformat:0 }}</div>
+      <div class="kpi-label">Average Value</div>
+    </div>
+  </div>
+</div>
+
+<div class="analytics-card overflow-hidden">
+  <div class="table-responsive">
+    <table class="table table-borderless bi-table mb-0">
+      <thead>
+        <tr>
+          <th>Date</th>
+          <th>Reference</th>
+          <th>Applicant</th>
+          <th>Hall</th>
+          <th>Status</th>
+          <th>Total Cost (₦)</th>
+          <th>Coupon</th>
+          <th>Created</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for booking in page_obj %}
+        <tr>
+          <td class="text-nowrap">{{ booking.booking_date|date:"M d, Y" }}</td>
+          <td class="fw-bold">{{ booking.booking_reference }}</td>
+          <td>{{ booking.user.email }}</td>
+          <td>{{ booking.hall.name }}</td>
+          <td>
+            <span class="badge bg-secondary bg-opacity-75">{{ booking.get_case_status_display }}</span>
+          </td>
+          <td class="text-end fw-bold">{{ booking.total_cost|floatformat:0 }}</td>
+          <td>{{ booking.coupon_code|default:"-" }}</td>
+          <td class="text-nowrap text-muted">{{ booking.created_at|date:"M d, H:i" }}</td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="8" class="text-center py-4 text-muted">No bookings found for the selected filters.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  
+  {% if page_obj.has_other_pages %}
+  <div class="mt-4 d-flex justify-content-end">
+    <!-- Basic Pagination -->
+    <nav aria-label="Page navigation">
+      <ul class="pagination pagination-sm">
+        {% if page_obj.has_previous %}
+        <li class="page-item"><a class="page-link" href="?{% for key, value in request.GET.items %}{% if key != 'page' %}{{ key }}={{ value }}&{% endif %}{% endfor %}page={{ page_obj.previous_page_number }}">Prev</a></li>
+        {% endif %}
+        <li class="page-item active"><span class="page-link">{{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span></li>
+        {% if page_obj.has_next %}
+        <li class="page-item"><a class="page-link" href="?{% for key, value in request.GET.items %}{% if key != 'page' %}{{ key }}={{ value }}&{% endif %}{% endfor %}page={{ page_obj.next_page_number }}">Next</a></li>
+        {% endif %}
+      </ul>
+    </nav>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

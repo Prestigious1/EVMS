@@ -1,0 +1,88 @@
+{% extends "reports/bi_base.html" %}
+{% load static %}
+
+{% block title %}Notification Report{% endblock %}
+{% block nav_reports_notifications %}active{% endblock %}
+
+{% block bi_title %}Notification Logs{% endblock %}
+{% block bi_subtitle %}Monitor in-app notifications sent to users and staff{% endblock %}
+{% block bi_icon %}bi-bell{% endblock %}
+
+{% block bi_custom_filters %}
+<div class="col-12 col-md-2">
+  <label class="form-label small text-muted mb-1">Status</label>
+  <select name="status" class="form-select form-select-sm">
+    <option value="">All</option>
+    <option value="UNREAD" {% if request.GET.status == 'UNREAD' %}selected{% endif %}>Unread</option>
+    <option value="READ" {% if request.GET.status == 'READ' %}selected{% endif %}>Read</option>
+  </select>
+</div>
+{% endblock %}
+
+{% block bi_content %}
+<div class="row g-3 mb-4">
+  <div class="col-12 col-md-4">
+    <div class="kpi-card border-primary">
+      <div class="kpi-value">{{ total_count }}</div>
+      <div class="kpi-label">Total Notifications</div>
+    </div>
+  </div>
+  <div class="col-12 col-md-4">
+    <div class="kpi-card border-info">
+      <div class="kpi-value">{{ read_rate|floatformat:1 }}%</div>
+      <div class="kpi-label">Read Rate</div>
+    </div>
+  </div>
+</div>
+
+<div class="analytics-card overflow-hidden">
+  <div class="table-responsive">
+    <table class="table table-borderless bi-table mb-0">
+      <thead>
+        <tr>
+          <th>Timestamp</th>
+          <th>Recipient</th>
+          <th>Message</th>
+          <th>Related Booking</th>
+          <th>Status</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for notif in page_obj %}
+        <tr>
+          <td class="text-nowrap">{{ notif.created_at|date:"M d, H:i" }}</td>
+          <td class="fw-bold">{{ notif.user.email }}</td>
+          <td>{{ notif.message|truncatechars:60 }}</td>
+          <td>{{ notif.reservation.booking_reference|default:"-" }}</td>
+          <td>
+            {% if notif.is_read %}
+              <span class="badge bg-success">Read</span>
+            {% else %}
+              <span class="badge bg-warning text-dark">Unread</span>
+            {% endif %}
+          </td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="5" class="text-center py-4 text-muted">No notifications found.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  
+  {% if page_obj.has_other_pages %}
+  <div class="mt-4 d-flex justify-content-end">
+    <nav aria-label="Page navigation">
+      <ul class="pagination pagination-sm">
+        {% if page_obj.has_previous %}
+        <li class="page-item"><a class="page-link" href="?{% for key, value in request.GET.items %}{% if key != 'page' %}{{ key }}={{ value }}&{% endif %}{% endfor %}page={{ page_obj.previous_page_number }}">Prev</a></li>
+        {% endif %}
+        <li class="page-item active"><span class="page-link">{{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span></li>
+        {% if page_obj.has_next %}
+        <li class="page-item"><a class="page-link" href="?{% for key, value in request.GET.items %}{% if key != 'page' %}{{ key }}={{ value }}&{% endif %}{% endfor %}page={{ page_obj.next_page_number }}">Next</a></li>
+        {% endif %}
+      </ul>
+    </nav>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

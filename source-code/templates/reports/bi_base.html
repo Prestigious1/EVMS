@@ -1,0 +1,270 @@
+{% extends "hall/base.html" %}
+{% load static %}
+
+{% block extra_head %}
+<!-- Chart.js for visualizations -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<style>
+  /* BI Layer Specific Styles - Premium Dark/Light Theme Support */
+  .analytics-card {
+    background: rgba(255,255,255,0.02);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: var(--radius-lg);
+    padding: 1.25rem;
+    height: 100%;
+    transition: var(--transition-smooth);
+  }
+  [data-bs-theme="light"] .analytics-card {
+    background: #FFFFFF;
+    border-color: var(--evms-light-border);
+    box-shadow: var(--shadow-card);
+  }
+  
+  .kpi-card {
+    background: rgba(255,255,255,0.02);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: var(--radius-md);
+    padding: 1.25rem;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    position: relative;
+    overflow: hidden;
+    transition: var(--transition-smooth);
+    height: 100%;
+  }
+  [data-bs-theme="light"] .kpi-card {
+    background: #FFFFFF;
+    border-color: var(--evms-light-border);
+    box-shadow: 0 2px 4px rgba(0,0,0,0.04);
+  }
+  .kpi-card:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-card-hover);
+    border-color: rgba(200,169,106,0.3);
+  }
+  .kpi-icon {
+    width: 40px; height: 40px;
+    border-radius: 10px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 1.25rem;
+    margin-bottom: 0.75rem;
+  }
+  .kpi-value {
+    font-size: 1.75rem;
+    font-weight: 700;
+    line-height: 1.2;
+    margin-bottom: 0.25rem;
+    color: var(--evms-gold);
+  }
+  [data-bs-theme="light"] .kpi-value {
+    color: var(--evms-blue);
+  }
+  .kpi-label {
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: rgba(255,255,255,0.6);
+    font-weight: 600;
+  }
+  [data-bs-theme="light"] .kpi-label {
+    color: #64748b;
+  }
+
+  /* Universal Filter Panel */
+  .bi-filter-panel {
+    background: rgba(15,23,42,0.6);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: var(--radius-md);
+    padding: 1rem;
+    margin-bottom: 1.5rem;
+    backdrop-filter: blur(8px);
+  }
+  [data-bs-theme="light"] .bi-filter-panel {
+    background: #f8fafc;
+    border-color: #e2e8f0;
+  }
+  
+  .chart-container {
+    position: relative;
+    height: 300px;
+    width: 100%;
+  }
+  .chart-container-sm {
+    height: 220px;
+  }
+  
+  /* Tables in BI */
+  .bi-table th {
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--evms-gold);
+    font-weight: 600;
+    background: rgba(255,255,255,0.03);
+    border-bottom: 1px solid rgba(255,255,255,0.1);
+  }
+  [data-bs-theme="light"] .bi-table th {
+    color: var(--evms-blue);
+    background: #f1f5f9;
+    border-bottom-color: #e2e8f0;
+  }
+  .bi-table td {
+    font-size: 0.85rem;
+    vertical-align: middle;
+    border-bottom: 1px solid rgba(255,255,255,0.05);
+  }
+  [data-bs-theme="light"] .bi-table td {
+    border-bottom-color: #f1f5f9;
+  }
+</style>
+{% block bi_extra_head %}{% endblock %}
+{% endblock %}
+
+{% block content %}
+<div class="page-header d-flex justify-content-between align-items-end mb-4">
+  <div>
+    <h1><i class="{% block bi_icon %}bi-graph-up-arrow{% endblock %} text-primary me-2"></i>{% block bi_title %}BI Dashboard{% endblock %}</h1>
+    <p class="page-subtitle text-muted mb-0">{% block bi_subtitle %}Enterprise Business Intelligence{% endblock %}</p>
+  </div>
+  
+  <div class="d-flex gap-2 align-items-center">
+    {% block bi_header_actions %}{% endblock %}
+    
+    {% if report_key %}
+    <!-- Universal Export Dropdown -->
+    <div class="dropdown">
+      <button class="btn btn-outline-secondary btn-sm dropdown-toggle hover-lift" type="button" data-bs-toggle="dropdown">
+        <i class="bi bi-download me-1"></i>Export
+      </button>
+      <ul class="dropdown-menu dropdown-menu-end shadow">
+        <li>
+          <a class="dropdown-item export-link" href="#" data-format="pdf">
+            <i class="bi bi-file-pdf text-danger me-2"></i>PDF Document
+          </a>
+        </li>
+        <li>
+          <a class="dropdown-item export-link" href="#" data-format="xlsx">
+            <i class="bi bi-file-excel text-success me-2"></i>Excel (XLSX)
+          </a>
+        </li>
+        <li>
+          <a class="dropdown-item export-link" href="#" data-format="csv">
+            <i class="bi bi-filetype-csv text-info me-2"></i>CSV File
+          </a>
+        </li>
+        <li><hr class="dropdown-divider"></li>
+        <li>
+          <a class="dropdown-item" href="javascript:window.print()">
+            <i class="bi bi-printer text-muted me-2"></i>Print View
+          </a>
+        </li>
+      </ul>
+    </div>
+    {% endif %}
+  </div>
+</div>
+
+{% block bi_filters %}
+<!-- Universal Filter Form (Inherited by all reports) -->
+{% if report_key %}
+<div class="bi-filter-panel">
+  <form method="get" id="filterForm" class="row g-2 align-items-end">
+    <!-- Search Box -->
+    <div class="col-12 col-md-3">
+      <label class="form-label small text-muted mb-1">Search</label>
+      <div class="input-group input-group-sm">
+        <span class="input-group-text bg-transparent border-end-0"><i class="bi bi-search"></i></span>
+        <input type="text" name="q" class="form-control border-start-0 ps-0" placeholder="Search..." value="{{ q }}">
+      </div>
+    </div>
+    
+    <!-- Date Range Preset -->
+    <div class="col-12 col-md-2">
+      <label class="form-label small text-muted mb-1">Date Period</label>
+      <select name="period" class="form-select form-select-sm" id="periodSelect" onchange="toggleCustomDates()">
+        {% for val, label in period_choices %}
+        <option value="{{ val }}" {% if period == val %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    
+    <!-- Custom Dates (Hidden by default) -->
+    <div class="col-12 col-md-3 custom-dates-group" style="{% if period != 'custom' %}display: none;{% endif %}">
+      <div class="d-flex gap-2">
+        <div>
+          <label class="form-label small text-muted mb-1">Start Date</label>
+          <input type="date" name="start_date" class="form-control form-control-sm" value="{{ start_date|date:'Y-m-d' }}">
+        </div>
+        <div>
+          <label class="form-label small text-muted mb-1">End Date</label>
+          <input type="date" name="end_date" class="form-control form-control-sm" value="{{ end_date|date:'Y-m-d' }}">
+        </div>
+      </div>
+    </div>
+    
+    <!-- Custom filters hook -->
+    {% block bi_custom_filters %}{% endblock %}
+    
+    <!-- Submit / Reset -->
+    <div class="col-auto">
+      <button type="submit" class="btn btn-primary btn-sm px-3">Filter</button>
+      <a href="?" class="btn btn-outline-secondary btn-sm ms-1">Reset</a>
+    </div>
+    
+    <!-- Keep pagination/sort state -->
+    <input type="hidden" name="sort" value="{{ sort }}">
+  </form>
+</div>
+{% endif %}
+{% endblock %}
+
+<!-- Main Body -->
+<div class="bi-content">
+  {% block bi_content %}{% endblock %}
+</div>
+
+<!-- Chart.js Global Config & Helpers -->
+<script>
+  function toggleCustomDates() {
+    const period = document.getElementById('periodSelect').value;
+    const group = document.querySelector('.custom-dates-group');
+    if (group) {
+      group.style.display = (period === 'custom') ? 'block' : 'none';
+    }
+  }
+
+  document.addEventListener("DOMContentLoaded", function() {
+    // Chart Defaults for theme
+    Chart.defaults.color = 'rgba(148,163,184,0.8)';
+    Chart.defaults.font.family = "'Inter', system-ui, -apple-system, sans-serif";
+    
+    // Bind Export Links
+    const exportLinks = document.querySelectorAll('.export-link');
+    if (exportLinks.length > 0) {
+      exportLinks.forEach(link => {
+        link.addEventListener('click', function(e) {
+          e.preventDefault();
+          const format = this.getAttribute('data-format');
+          // Grab current URL parameters
+          const urlParams = new URLSearchParams(window.location.search);
+          urlParams.set('report', '{{ report_key }}');
+          urlParams.set('format', format);
+          window.location.href = "{% url 'reports:universal_export' %}?" + urlParams.toString();
+        });
+      });
+    }
+  });
+
+  // Helper for Theme Colors
+  function getThemeColors() {
+    const isDark = document.documentElement.getAttribute('data-bs-theme') !== 'light';
+    return {
+      gridColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)',
+      textColor: isDark ? 'rgba(226,232,240,0.8)' : 'rgba(15,23,42,0.8)',
+    };
+  }
+</script>
+{% block bi_scripts %}{% endblock %}
+
+{% endblock %}

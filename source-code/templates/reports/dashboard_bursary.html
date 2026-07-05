@@ -1,0 +1,176 @@
+{% extends "reports/bi_base.html" %}
+{% load static %}
+
+{% block title %}Bursary Dashboard{% endblock %}
+{% block nav_reports_bursary_dashboard %}active{% endblock %}
+
+{% block bi_title %}Bursary Overview{% endblock %}
+{% block bi_subtitle %}Payment verification, revenue & collections{% endblock %}
+{% block bi_icon %}bi-bank{% endblock %}
+
+{% block bi_filters %}{% endblock %}
+
+{% block bi_content %}
+<div class="row g-3 mb-4">
+  <div class="col-6 col-md-3">
+    <div class="kpi-card border-warning">
+      <div class="kpi-icon text-warning bg-warning bg-opacity-10"><i class="bi bi-hourglass-split"></i></div>
+      <div class="kpi-value">{{ pending_verification }}</div>
+      <div class="kpi-label">Pending Verification</div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="kpi-card border-success">
+      <div class="kpi-icon text-success bg-success bg-opacity-10"><i class="bi bi-cash-stack"></i></div>
+      <div class="kpi-value fs-5">₦{{ revenue_month|floatformat:0 }}</div>
+      <div class="kpi-label">Revenue (Month)</div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="kpi-card border-primary">
+      <div class="kpi-icon text-primary bg-primary bg-opacity-10"><i class="bi bi-wallet2"></i></div>
+      <div class="kpi-value fs-5">₦{{ revenue_today|floatformat:0 }}</div>
+      <div class="kpi-label">Collected Today</div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="kpi-card border-danger">
+      <div class="kpi-icon text-danger bg-danger bg-opacity-10"><i class="bi bi-exclamation-triangle"></i></div>
+      <div class="kpi-value">{{ outstanding_count }}</div>
+      <div class="kpi-label">Outstanding Payments</div>
+    </div>
+  </div>
+</div>
+
+<div class="row g-4 mb-4">
+  <div class="col-12 col-lg-8">
+    <div class="analytics-card">
+      <h6 class="text-uppercase text-muted fw-bold mb-4">Daily Collections (Last 30 Days)</h6>
+      <div class="chart-container">
+        <canvas id="trendChart"></canvas>
+      </div>
+    </div>
+  </div>
+  <div class="col-12 col-lg-4">
+    <div class="analytics-card">
+      <h6 class="text-uppercase text-muted fw-bold mb-4">Payment Methods (Volume vs Value)</h6>
+      <div class="chart-container">
+        <canvas id="payChart"></canvas>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="row g-4">
+  <div class="col-12 col-lg-7">
+    <div class="analytics-card overflow-hidden">
+      <div class="d-flex justify-content-between align-items-center mb-4">
+        <h6 class="text-uppercase text-muted fw-bold mb-0">Pending Payment Proofs Queue</h6>
+      </div>
+      <div class="table-responsive">
+        <table class="table table-borderless bi-table mb-0">
+          <thead>
+            <tr>
+              <th>Date</th>
+              <th>Applicant</th>
+              <th>Type</th>
+              <th>Amount (₦)</th>
+              <th>Reference</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for proof in pending_proofs %}
+            <tr>
+              <td class="text-nowrap">{{ proof.uploaded_at|date:"M d, H:i" }}</td>
+              <td>{{ proof.uploaded_by.email }}</td>
+              <td><span class="badge bg-secondary">{{ proof.payment_type }}</span></td>
+              <td class="fw-bold">{{ proof.amount_claimed|floatformat:0 }}</td>
+              <td>{{ proof.transaction_ref }}</td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="5" class="text-center text-muted">Queue is empty</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+  
+  <div class="col-12 col-lg-5">
+    <div class="analytics-card">
+      <h6 class="text-uppercase text-muted fw-bold mb-4">Damage Recovery Stats</h6>
+      <ul class="list-group list-group-flush bg-transparent mb-4">
+        <li class="list-group-item bg-transparent d-flex justify-content-between align-items-center">
+          Pending Damage Verifications
+          <span class="badge bg-warning rounded-pill">{{ pending_damage_verif }}</span>
+        </li>
+        <li class="list-group-item bg-transparent d-flex justify-content-between align-items-center">
+          Outstanding Damage Incidents
+          <span class="badge bg-danger rounded-pill">{{ outstanding_damage }}</span>
+        </li>
+        <li class="list-group-item bg-transparent d-flex justify-content-between align-items-center">
+          Amount Outstanding
+          <span class="fw-bold text-danger">₦{{ damage_amount_outstanding|floatformat:0 }}</span>
+        </li>
+      </ul>
+      <a href="{% url 'reports:report_damage' %}" class="btn btn-outline-danger btn-sm w-100">Go to Damage Reports</a>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block bi_scripts %}
+<script>
+document.addEventListener("DOMContentLoaded", function() {
+  const c = getThemeColors();
+  
+  // 1. Trend Chart (Line)
+  const ctxTrend = document.getElementById('trendChart');
+  if(ctxTrend) {
+    new Chart(ctxTrend, {
+      type: 'line',
+      data: {
+        labels: {{ coll_labels|safe }},
+        datasets: [{
+          label: 'Amount (₦)',
+          data: {{ coll_totals|safe }},
+          borderColor: '#facc15',
+          backgroundColor: 'rgba(250,204,21,0.1)',
+          borderWidth: 2,
+          tension: 0.4,
+          fill: true
+        }]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: {
+          x: { grid: { display: false } },
+          y: { grid: { color: c.gridColor }, beginAtZero: true }
+        }
+      }
+    });
+  }
+
+  // 2. Pay Method (Pie)
+  const ctxPay = document.getElementById('payChart');
+  if(ctxPay) {
+    new Chart(ctxPay, {
+      type: 'pie',
+      data: {
+        labels: {{ pay_method_labels|safe }},
+        datasets: [{
+          data: {{ pay_method_amounts|safe }},
+          backgroundColor: ['#60a5fa', '#34d399', '#facc15', '#a78bfa'],
+          borderWidth: 0
+        }]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, color: c.textColor } } },
+      }
+    });
+  }
+});
+</script>
+{% endblock %}

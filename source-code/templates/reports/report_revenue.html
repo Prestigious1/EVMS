@@ -1,0 +1,139 @@
+{% extends "reports/bi_base.html" %}
+{% load static %}
+
+{% block title %}Revenue Report{% endblock %}
+{% block nav_reports_revenue %}active{% endblock %}
+
+{% block bi_title %}Revenue Report{% endblock %}
+{% block bi_subtitle %}Analyze confirmed payments across all sources{% endblock %}
+{% block bi_icon %}bi-cash-stack{% endblock %}
+
+{% block bi_custom_filters %}
+<div class="col-12 col-md-2">
+  <label class="form-label small text-muted mb-1">Method</label>
+  <select name="payment_method" class="form-select form-select-sm">
+    <option value="">All Methods</option>
+    <option value="ONLINE" {% if request.GET.payment_method == 'ONLINE' %}selected{% endif %}>Online (Paystack)</option>
+    <option value="BANK_TRANSFER" {% if request.GET.payment_method == 'BANK_TRANSFER' %}selected{% endif %}>Bank Transfer</option>
+  </select>
+</div>
+{% endblock %}
+
+{% block bi_content %}
+<div class="row g-3 mb-4">
+  <div class="col-12 col-md-3">
+    <div class="kpi-card border-success">
+      <div class="kpi-value fs-4">₦{{ revenue_total|floatformat:0 }}</div>
+      <div class="kpi-label">Total Revenue</div>
+    </div>
+  </div>
+  <div class="col-12 col-md-3">
+    <div class="kpi-card border-primary">
+      <div class="kpi-value fs-4">₦{{ booking_revenue|floatformat:0 }}</div>
+      <div class="kpi-label">From Bookings</div>
+    </div>
+  </div>
+  <div class="col-12 col-md-3">
+    <div class="kpi-card border-warning">
+      <div class="kpi-value fs-4">₦{{ damage_revenue|floatformat:0 }}</div>
+      <div class="kpi-label">From Damage Recovery</div>
+    </div>
+  </div>
+  <div class="col-12 col-md-3">
+    <div class="kpi-card border-danger">
+      <div class="kpi-value fs-4">₦{{ penalty_revenue|floatformat:0 }}</div>
+      <div class="kpi-label">From Penalties</div>
+    </div>
+  </div>
+</div>
+
+<div class="row g-4 mb-4">
+  <div class="col-12">
+    <div class="analytics-card">
+      <h6 class="text-uppercase text-muted fw-bold mb-4">Revenue Trend (Monthly)</h6>
+      <div class="chart-container-sm">
+        <canvas id="revChart"></canvas>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="analytics-card overflow-hidden">
+  <div class="table-responsive">
+    <table class="table table-borderless bi-table mb-0">
+      <thead>
+        <tr>
+          <th>Date</th>
+          <th>Reference</th>
+          <th>User</th>
+          <th>Method</th>
+          <th>Provider</th>
+          <th>Amount (₦)</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for pay in page_obj %}
+        <tr>
+          <td class="text-nowrap">{{ pay.created_at|date:"M d, Y H:i" }}</td>
+          <td class="fw-bold">{{ pay.reservation.booking_reference|default:"-" }}</td>
+          <td>{{ pay.user.email }}</td>
+          <td><span class="badge bg-secondary">{{ pay.payment_method }}</span></td>
+          <td>{{ pay.provider|default:"-" }}</td>
+          <td class="text-end fw-bold text-success">₦{{ pay.amount|floatformat:0 }}</td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="6" class="text-center py-4 text-muted">No confirmed payments found.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  
+  {% if page_obj.has_other_pages %}
+  <div class="mt-4 d-flex justify-content-end">
+    <nav aria-label="Page navigation">
+      <ul class="pagination pagination-sm">
+        {% if page_obj.has_previous %}
+        <li class="page-item"><a class="page-link" href="?{% for key, value in request.GET.items %}{% if key != 'page' %}{{ key }}={{ value }}&{% endif %}{% endfor %}page={{ page_obj.previous_page_number }}">Prev</a></li>
+        {% endif %}
+        <li class="page-item active"><span class="page-link">{{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span></li>
+        {% if page_obj.has_next %}
+        <li class="page-item"><a class="page-link" href="?{% for key, value in request.GET.items %}{% if key != 'page' %}{{ key }}={{ value }}&{% endif %}{% endfor %}page={{ page_obj.next_page_number }}">Next</a></li>
+        {% endif %}
+      </ul>
+    </nav>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}
+
+{% block bi_scripts %}
+<script>
+document.addEventListener("DOMContentLoaded", function() {
+  const c = getThemeColors();
+  
+  const ctxRev = document.getElementById('revChart');
+  if(ctxRev) {
+    new Chart(ctxRev, {
+      type: 'bar',
+      data: {
+        labels: {{ rev_labels|safe }},
+        datasets: [{
+          label: 'Revenue (₦)',
+          data: {{ rev_data|safe }},
+          backgroundColor: '#4ade80',
+          borderRadius: 4
+        }]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: {
+          x: { grid: { display: false } },
+          y: { grid: { color: c.gridColor }, beginAtZero: true }
+        }
+      }
+    });
+  }
+});
+</script>
+{% endblock %}

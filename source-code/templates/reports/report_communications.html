@@ -1,0 +1,94 @@
+{% extends "reports/bi_base.html" %}
+{% load static %}
+
+{% block title %}Communication Report{% endblock %}
+{% block nav_reports_communications %}active{% endblock %}
+
+{% block bi_title %}Communication & Feedback{% endblock %}
+{% block bi_subtitle %}Analyze applicant messages, inquiries and feedback{% endblock %}
+{% block bi_icon %}bi-chat-left-text{% endblock %}
+
+{% block bi_custom_filters %}
+<div class="col-12 col-md-2">
+  <label class="form-label small text-muted mb-1">Status</label>
+  <select name="status" class="form-select form-select-sm">
+    <option value="">All</option>
+    <option value="UNREAD" {% if request.GET.status == 'UNREAD' %}selected{% endif %}>Unread</option>
+    <option value="READ" {% if request.GET.status == 'READ' %}selected{% endif %}>Read</option>
+    <option value="RESOLVED" {% if request.GET.status == 'RESOLVED' %}selected{% endif %}>Resolved</option>
+  </select>
+</div>
+{% endblock %}
+
+{% block bi_content %}
+<div class="row g-3 mb-4">
+  <div class="col-12 col-md-4">
+    <div class="kpi-card border-info">
+      <div class="kpi-value">{{ total_count }}</div>
+      <div class="kpi-label">Total Messages</div>
+    </div>
+  </div>
+  <div class="col-12 col-md-4">
+    <div class="kpi-card border-warning">
+      <div class="kpi-value">{{ unread_count }}</div>
+      <div class="kpi-label">Unread Messages</div>
+    </div>
+  </div>
+  <div class="col-12 col-md-4">
+    <div class="kpi-card border-success">
+      <div class="kpi-value">{{ resolution_rate|floatformat:1 }}%</div>
+      <div class="kpi-label">Resolution Rate</div>
+    </div>
+  </div>
+</div>
+
+<div class="analytics-card overflow-hidden">
+  <div class="table-responsive">
+    <table class="table table-borderless bi-table mb-0">
+      <thead>
+        <tr>
+          <th>Date Received</th>
+          <th>Sender</th>
+          <th>Subject / Message Preview</th>
+          <th>Status</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for comm in page_obj %}
+        <tr>
+          <td class="text-nowrap">{{ comm.created_at|date:"M d, H:i" }}</td>
+          <td class="fw-bold">{{ comm.sender_name }} <br> <small class="text-muted">{{ comm.sender_email }}</small></td>
+          <td>{{ comm.message|truncatechars:80 }}</td>
+          <td>
+            <span class="badge 
+              {% if comm.status == 'RESOLVED' %}bg-success
+              {% elif comm.status == 'UNREAD' %}bg-danger
+              {% else %}bg-secondary{% endif %}">
+              {{ comm.status }}
+            </span>
+          </td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="4" class="text-center py-4 text-muted">No messages found.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  
+  {% if page_obj.has_other_pages %}
+  <div class="mt-4 d-flex justify-content-end">
+    <nav aria-label="Page navigation">
+      <ul class="pagination pagination-sm">
+        {% if page_obj.has_previous %}
+        <li class="page-item"><a class="page-link" href="?{% for key, value in request.GET.items %}{% if key != 'page' %}{{ key }}={{ value }}&{% endif %}{% endfor %}page={{ page_obj.previous_page_number }}">Prev</a></li>
+        {% endif %}
+        <li class="page-item active"><span class="page-link">{{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span></li>
+        {% if page_obj.has_next %}
+        <li class="page-item"><a class="page-link" href="?{% for key, value in request.GET.items %}{% if key != 'page' %}{{ key }}={{ value }}&{% endif %}{% endfor %}page={{ page_obj.next_page_number }}">Next</a></li>
+        {% endif %}
+      </ul>
+    </nav>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

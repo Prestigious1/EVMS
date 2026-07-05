@@ -1,0 +1,78 @@
+{% extends "reports/bi_base.html" %}
+{% load static %}
+
+{% block title %}Applicant Report{% endblock %}
+{% block nav_reports_applicants %}active{% endblock %}
+
+{% block bi_title %}Applicant Demographics{% endblock %}
+{% block bi_subtitle %}Analyze applicant behavior, categories, and booking volume{% endblock %}
+{% block bi_icon %}bi-people{% endblock %}
+
+{% block bi_custom_filters %}
+<div class="col-12 col-md-2">
+  <label class="form-label small text-muted mb-1">Sort By</label>
+  <select name="sort" class="form-select form-select-sm">
+    <option value="newest" {% if sort == 'newest' %}selected{% endif %}>Newest First</option>
+    <option value="oldest" {% if sort == 'oldest' %}selected{% endif %}>Oldest First</option>
+    <option value="most_active" {% if sort == 'most_active' %}selected{% endif %}>Most Active</option>
+    <option value="az" {% if sort == 'az' %}selected{% endif %}>A-Z</option>
+    <option value="za" {% if sort == 'za' %}selected{% endif %}>Z-A</option>
+  </select>
+</div>
+{% endblock %}
+
+{% block bi_content %}
+<div class="row g-3 mb-4">
+  <div class="col-12 col-md-4">
+    <div class="kpi-card border-primary">
+      <div class="kpi-value">{{ total_count }}</div>
+      <div class="kpi-label">Total Applicants</div>
+    </div>
+  </div>
+</div>
+
+<div class="analytics-card overflow-hidden">
+  <div class="table-responsive">
+    <table class="table table-borderless bi-table mb-0">
+      <thead>
+        <tr>
+          <th>Email</th>
+          <th>Name</th>
+          <th>Phone</th>
+          <th>Total Bookings</th>
+          <th>Joined Date</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for user in page_obj %}
+        <tr>
+          <td class="fw-bold">{{ user.email }}</td>
+          <td>{{ user.first_name }} {{ user.last_name }}</td>
+          <td>{{ user.phone_number|default:"-" }}</td>
+          <td class="text-center"><span class="badge bg-primary rounded-pill">{{ user.reservations|default:"0" }}</span></td>
+          <td class="text-nowrap">{{ user.date_joined|date:"M d, Y" }}</td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="5" class="text-center py-4 text-muted">No applicants found.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  
+  {% if page_obj.has_other_pages %}
+  <div class="mt-4 d-flex justify-content-end">
+    <nav aria-label="Page navigation">
+      <ul class="pagination pagination-sm">
+        {% if page_obj.has_previous %}
+        <li class="page-item"><a class="page-link" href="?{% for key, value in request.GET.items %}{% if key != 'page' %}{{ key }}={{ value }}&{% endif %}{% endfor %}page={{ page_obj.previous_page_number }}">Prev</a></li>
+        {% endif %}
+        <li class="page-item active"><span class="page-link">{{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span></li>
+        {% if page_obj.has_next %}
+        <li class="page-item"><a class="page-link" href="?{% for key, value in request.GET.items %}{% if key != 'page' %}{{ key }}={{ value }}&{% endif %}{% endfor %}page={{ page_obj.next_page_number }}">Next</a></li>
+        {% endif %}
+      </ul>
+    </nav>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

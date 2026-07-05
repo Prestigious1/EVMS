@@ -1,0 +1,98 @@
+{% extends "reports/bi_base.html" %}
+{% load static %}
+
+{% block title %}Hall Utilisation Report{% endblock %}
+{% block nav_reports_halls %}active{% endblock %}
+
+{% block bi_title %}Hall Utilisation Report{% endblock %}
+{% block bi_subtitle %}Analyze hall performance, capacity and booking frequency{% endblock %}
+{% block bi_icon %}bi-building{% endblock %}
+
+{% block bi_custom_filters %}
+<div class="col-12 col-md-2">
+  <label class="form-label small text-muted mb-1">Status</label>
+  <select name="status" class="form-select form-select-sm">
+    <option value="">All Statuses</option>
+    <option value="ACTIVE" {% if request.GET.status == 'ACTIVE' %}selected{% endif %}>Active</option>
+    <option value="INACTIVE" {% if request.GET.status == 'INACTIVE' %}selected{% endif %}>Inactive</option>
+    <option value="MAINTENANCE" {% if request.GET.status == 'MAINTENANCE' %}selected{% endif %}>Maintenance</option>
+  </select>
+</div>
+{% endblock %}
+
+{% block bi_content %}
+<div class="row g-3 mb-4">
+  <div class="col-12 col-md-4">
+    <div class="kpi-card border-primary">
+      <div class="kpi-value">{{ total_count }}</div>
+      <div class="kpi-label">Total Halls</div>
+    </div>
+  </div>
+  <div class="col-12 col-md-4">
+    <div class="kpi-card border-success">
+      <div class="kpi-value">{{ active_count }}</div>
+      <div class="kpi-label">Active Halls</div>
+    </div>
+  </div>
+  <div class="col-12 col-md-4">
+    <div class="kpi-card border-warning">
+      <div class="kpi-value">{{ total_capacity }}</div>
+      <div class="kpi-label">Total Campus Capacity</div>
+    </div>
+  </div>
+</div>
+
+<div class="analytics-card overflow-hidden">
+  <div class="table-responsive">
+    <table class="table table-borderless bi-table mb-0">
+      <thead>
+        <tr>
+          <th>Hall Name</th>
+          <th>Location</th>
+          <th>Capacity</th>
+          <th>Base Price (₦)</th>
+          <th>Status</th>
+          <th>Total Bookings</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for hall in page_obj %}
+        <tr>
+          <td class="fw-bold">{{ hall.name }}</td>
+          <td>{{ hall.location|default:"-" }}</td>
+          <td>{{ hall.capacity }}</td>
+          <td class="text-end fw-bold">₦{{ hall.price|floatformat:0 }}</td>
+          <td>
+            <span class="badge 
+              {% if hall.status == 'ACTIVE' %}bg-success
+              {% elif hall.status == 'MAINTENANCE' %}bg-warning
+              {% else %}bg-secondary{% endif %}">
+              {{ hall.status }}
+            </span>
+          </td>
+          <td class="text-center">{{ hall.booking_count|default:"0" }}</td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="6" class="text-center py-4 text-muted">No halls found.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  
+  {% if page_obj.has_other_pages %}
+  <div class="mt-4 d-flex justify-content-end">
+    <nav aria-label="Page navigation">
+      <ul class="pagination pagination-sm">
+        {% if page_obj.has_previous %}
+        <li class="page-item"><a class="page-link" href="?{% for key, value in request.GET.items %}{% if key != 'page' %}{{ key }}={{ value }}&{% endif %}{% endfor %}page={{ page_obj.previous_page_number }}">Prev</a></li>
+        {% endif %}
+        <li class="page-item active"><span class="page-link">{{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span></li>
+        {% if page_obj.has_next %}
+        <li class="page-item"><a class="page-link" href="?{% for key, value in request.GET.items %}{% if key != 'page' %}{{ key }}={{ value }}&{% endif %}{% endfor %}page={{ page_obj.next_page_number }}">Next</a></li>
+        {% endif %}
+      </ul>
+    </nav>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

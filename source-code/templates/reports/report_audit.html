@@ -1,0 +1,87 @@
+{% extends "reports/bi_base.html" %}
+{% load static %}
+
+{% block title %}Audit Trail Report{% endblock %}
+{% block nav_reports_audit %}active{% endblock %}
+
+{% block bi_title %}Enterprise Audit Trail{% endblock %}
+{% block bi_subtitle %}Immutable log of all user activities and system events{% endblock %}
+{% block bi_icon %}bi-shield-check{% endblock %}
+
+{% block bi_custom_filters %}
+<div class="col-12 col-md-2">
+  <label class="form-label small text-muted mb-1">Module</label>
+  <select name="module" class="form-select form-select-sm">
+    <option value="">All Modules</option>
+    <option value="Auth" {% if request.GET.module == 'Auth' %}selected{% endif %}>Authentication</option>
+    <option value="Booking" {% if request.GET.module == 'Booking' %}selected{% endif %}>Booking</option>
+    <option value="Payment" {% if request.GET.module == 'Payment' %}selected{% endif %}>Payment</option>
+    <option value="Inspection" {% if request.GET.module == 'Inspection' %}selected{% endif %}>Inspection</option>
+    <option value="Report" {% if request.GET.module == 'Report' %}selected{% endif %}>Reporting</option>
+  </select>
+</div>
+{% endblock %}
+
+{% block bi_content %}
+<div class="row g-3 mb-4">
+  <div class="col-12 col-md-6">
+    <div class="kpi-card border-secondary">
+      <div class="kpi-value">{{ total_count }}</div>
+      <div class="kpi-label">Events Logged</div>
+    </div>
+  </div>
+  <div class="col-12 col-md-6">
+    <div class="kpi-card border-info">
+      <div class="kpi-value">{{ auth_events }}</div>
+      <div class="kpi-label">Auth Events</div>
+    </div>
+  </div>
+</div>
+
+<div class="analytics-card overflow-hidden">
+  <div class="table-responsive">
+    <table class="table table-borderless bi-table mb-0">
+      <thead>
+        <tr>
+          <th>Timestamp</th>
+          <th>User</th>
+          <th>Action</th>
+          <th>Module</th>
+          <th>IP Address</th>
+          <th>System info</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for log in page_obj %}
+        <tr>
+          <td class="text-nowrap text-muted">{{ log.timestamp|date:"M d, H:i:s" }}</td>
+          <td class="fw-bold">{{ log.user.email|default:"System / Anonymous" }}</td>
+          <td>{{ log.action }}</td>
+          <td><span class="badge bg-secondary bg-opacity-25 text-body">{{ log.affected_module }}</span></td>
+          <td class="small">{{ log.ip_address }}</td>
+          <td class="small text-muted" title="{{ log.user_agent }}">{{ log.browser|default:"-" }} / {{ log.os|default:"-" }}</td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="6" class="text-center py-4 text-muted">No audit logs found.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  
+  {% if page_obj.has_other_pages %}
+  <div class="mt-4 d-flex justify-content-end">
+    <nav aria-label="Page navigation">
+      <ul class="pagination pagination-sm">
+        {% if page_obj.has_previous %}
+        <li class="page-item"><a class="page-link" href="?{% for key, value in request.GET.items %}{% if key != 'page' %}{{ key }}={{ value }}&{% endif %}{% endfor %}page={{ page_obj.previous_page_number }}">Prev</a></li>
+        {% endif %}
+        <li class="page-item active"><span class="page-link">{{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span></li>
+        {% if page_obj.has_next %}
+        <li class="page-item"><a class="page-link" href="?{% for key, value in request.GET.items %}{% if key != 'page' %}{{ key }}={{ value }}&{% endif %}{% endfor %}page={{ page_obj.next_page_number }}">Next</a></li>
+        {% endif %}
+      </ul>
+    </nav>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

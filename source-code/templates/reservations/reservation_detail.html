@@ -171,7 +171,7 @@
         <li class="nav-item" role="presentation">
           <button class="nav-link text-success fw-semibold" id="bursary-tab" data-bs-toggle="tab" data-bs-target="#bursary" type="button" role="tab" aria-selected="false">
             <i class="bi bi-bank me-1"></i>Bursary
-            {% if reservation.case_status == BookingCaseStatus.UNDER_BURSARY_VERIFICATION or reservation.case_status == BookingCaseStatus.UNDER_DAMAGE_PAYMENT_VERIFICATION %}
+            {% if reservation.case_status == BookingCaseStatus.UNDER_BURSARY_VERIFICATION or reservation.case_status == BookingCaseStatus.UNDER_DAMAGE_PAYMENT_VERIFICATION or has_pending_proofs %}
             <span class="badge bg-danger ms-1">Action Required</span>
             {% endif %}
           </button>
@@ -381,9 +381,24 @@
                     Your payment has been fully verified and settled.
                   </div>
                 </div>
-                <a href="{% url 'payments:enterprise_receipt_pdf' booking_reference=reservation.booking_reference %}" class="btn btn-sm btn-success" target="_blank">
-                  <i class="bi bi-download me-1"></i>Official Receipt
-                </a>
+                {% if reservation.case_status == BookingCaseStatus.BOOKING_APPROVED or reservation.case_status == BookingCaseStatus.EVENT_COMPLETED or reservation.case_status == BookingCaseStatus.CASE_CLOSED %}
+                <div class="d-flex gap-2">
+                  <a href="{% url 'payments:enterprise_receipt_pdf' booking_reference=reservation.booking_reference %}" class="btn btn-sm btn-success" target="_blank">
+                    <i class="bi bi-download me-1"></i>Receipt
+                  </a>
+                  {% if reservation.booking_permit_generated %}
+                    {% for doc in reservation.documents.all %}
+                      {% if doc.document_type == 'PERMIT' %}
+                        <a href="{{ doc.file.url }}" class="btn btn-sm btn-primary" target="_blank" download>
+                          <i class="bi bi-file-earmark-arrow-down me-1"></i>Permit
+                        </a>
+                      {% endif %}
+                    {% endfor %}
+                  {% endif %}
+                </div>
+                {% else %}
+                <span class="text-muted small fst-italic"><i class="bi bi-hourglass-split me-1"></i>Final documents available after Ventures approval</span>
+                {% endif %}
               </div>
               {% endif %}
 
@@ -543,14 +558,24 @@
                     <div class="border p-3 bg-body rounded mb-3 border-start border-4 {% if dr.is_forgiven %}border-secondary{% elif dr.is_paid %}border-success{% else %}border-danger{% endif %}">
                       <div class="d-flex justify-content-between align-items-center mb-2">
                         <span class="fw-semibold small">Report #{{ dr.id }}</span>
-                        <span class="badge {% if dr.is_forgiven %}bg-secondary{% elif dr.is_paid %}bg-success{% else %}bg-danger{% endif %}">
-                          {% if dr.is_forgiven %}Forgiven{% elif dr.is_paid %}Paid{% else %}Unpaid{% endif %}
-                        </span>
+                        <div>
+                          <span class="badge {% if dr.is_forgiven %}bg-secondary{% elif dr.is_paid %}bg-success{% else %}bg-danger{% endif %} me-2">
+                            {% if dr.is_forgiven %}Forgiven{% elif dr.is_paid %}Paid{% else %}Unpaid{% endif %}
+                          </span>
+                          {% if not dr.is_forgiven and not dr.is_paid %}
+                            {% if can_manage_facility or can_manage_ventures %}
+                            <form method="post" action="{% url 'reservations:forgive_damage' dr.id %}" style="display:inline;" onsubmit="return confirm('Forgive this damage report? This cannot be undone.');">
+                              {% csrf_token %}
+                              <button type="submit" class="btn btn-xs btn-sm btn-outline-secondary py-0 px-1 small">Forgive</button>
+                            </form>
+                            {% endif %}
+                          {% endif %}
+                        </div>
                       </div>
                       <div class="small text-body-secondary mb-2">{{ dr.description|default:"No description." }}</div>
                       <div class="fw-semibold mb-2 text-danger">Amount: ₦{{ dr.amount }}</div>
 
-                      {% if is_applicant and not dr.is_paid and not dr.is_forgiven and reservation.case_status == BookingCaseStatus.AWAITING_DAMAGE_PAYMENT %}
+                      {% if is_applicant and not dr.is_paid and not dr.is_forgiven %}
                         <div class="mt-3 border-top pt-3">
                           <form method="post" action="{% url 'payments:start_damage_payment' dr.id %}" class="mb-2">
                             {% csrf_token %}
@@ -562,7 +587,8 @@
                           
                           <div class="text-center text-muted" style="font-size:0.7rem; margin: 4px 0;">OR UPLOAD PROOF</div>
                           
-                          <form method="post" action="{% url 'reservations:submit_damage_payment_proof' reservation.booking_reference %}" enctype="multipart/form-data">
+                          <form method="post" action="{% url 'reservations:submit_damage_payment_proof' reservation.booking_reference %}" enctype="multipart/form-data"
+                                onsubmit="evmsShowUploadingState(this)">
                             {% csrf_token %}
                             <div class="mb-1">
                               <input type="file" name="receipt_file" class="form-control form-control-sm" accept=".pdf,.jpg,.jpeg,.png,.webp" required>
@@ -575,8 +601,16 @@
                                 <input type="number" step="0.01" name="amount_claimed" class="form-control form-control-sm" placeholder="Amt (₦)" required>
                               </div>
                             </div>
-                            <button type="submit" class="btn btn-outline-danger btn-sm w-100">Submit Proof</button>
+                            <button type="submit" class="btn btn-outline-danger btn-sm w-100 evms-proof-submit-btn">
+                              <span class="submit-label">Submit Damage Proof</span>
+                              <span class="submit-loading d-none"><span class="spinner-border spinner-border-sm me-1" role="status"></span>Uploading…</span>
+                            </button>
                           </form>
+                        </div>
+                      {% endif %}
+                      {% if dr.is_paid %}
+                        <div class="mt-3 border-top pt-2">
+                          <a href="{% url 'payments:damage_receipt_pdf' dr.id %}" class="btn btn-outline-success btn-sm w-100"><i class="bi bi-download me-1"></i>Download Official Receipt</a>
                         </div>
                       {% endif %}
                     </div>
@@ -597,6 +631,46 @@
                         </span>
                       </div>
                       <div class="small text-body-secondary mt-1">₦{{ pen.amount }}</div>
+                      
+                      {% if is_applicant and not pen.is_paid and not pen.is_forgiven %}
+                        <div class="mt-3 border-top pt-3">
+                          <form method="post" action="{% url 'payments:start_penalty_payment' pen.id %}" class="mb-2">
+                            {% csrf_token %}
+                            <input type="hidden" name="penalty_id" value="{{ pen.id }}">
+                            <button type="submit" class="btn btn-warning btn-sm w-100 fw-semibold text-dark">
+                              <i class="bi bi-credit-card me-1"></i>Pay Online
+                            </button>
+                          </form>
+                          
+                          <div class="text-center text-muted" style="font-size:0.7rem; margin: 4px 0;">OR UPLOAD PROOF</div>
+                          
+                          <form method="post" action="{% url 'reservations:submit_penalty_payment_proof' reservation.booking_reference %}" enctype="multipart/form-data"
+                                onsubmit="evmsShowUploadingState(this)">
+                            {% csrf_token %}
+                            <input type="hidden" name="penalty_id" value="{{ pen.id }}">
+                            <div class="mb-1">
+                              <input type="file" name="receipt_file" class="form-control form-control-sm" accept=".pdf,.jpg,.jpeg,.png,.webp" required>
+                            </div>
+                            <div class="row g-1 mb-2">
+                              <div class="col-sm-6">
+                                <input type="text" name="transaction_ref" class="form-control form-control-sm" placeholder="Txn Ref">
+                              </div>
+                              <div class="col-sm-6">
+                                <input type="number" step="0.01" name="amount_claimed" class="form-control form-control-sm" placeholder="Amt (₦)" required>
+                              </div>
+                            </div>
+                            <button type="submit" class="btn btn-outline-warning btn-sm w-100 text-dark fw-semibold evms-proof-submit-btn">
+                              <span class="submit-label">Submit Penalty Proof</span>
+                              <span class="submit-loading d-none"><span class="spinner-border spinner-border-sm me-1" role="status"></span>Uploading…</span>
+                            </button>
+                          </form>
+                        </div>
+                      {% endif %}
+                      {% if pen.is_paid %}
+                        <div class="mt-3 border-top pt-2">
+                          <a href="{% url 'payments:penalty_receipt_pdf' pen.id %}" class="btn btn-outline-success btn-sm w-100"><i class="bi bi-download me-1"></i>Download Official Receipt</a>
+                        </div>
+                      {% endif %}
                     </div>
                   {% empty %}
                     <div class="text-body-secondary small py-2"><i class="bi bi-check-circle me-1 text-success"></i>No penalties on this case.</div>
@@ -1018,7 +1092,8 @@
             </div>
             {% endif %}
 
-            {# ── Penalty / Fine Management ── #}
+            {# ── Penalty / Fine Management (Ventures only) ── #}
+            {% if can_manage_ventures or can_view_all %}
             <div class="card shadow-sm border-0 mb-4">
               <div class="card-header bg-body-tertiary">
                 <h6 class="mb-0"><i class="bi bi-exclamation-octagon text-danger me-2"></i>Add Penalty / Fine</h6>
@@ -1060,8 +1135,10 @@
                       {{ pen.title }} — ₦{{ pen.amount }}
                     </div>
                     {% if not pen.is_forgiven and not pen.is_paid %}
-                    <a href="{% url 'reservations:forgive_penalty' pen.id %}" class="btn btn-xs btn-sm btn-outline-secondary py-0 px-1 small"
-                       onclick="return confirm('Forgive this penalty?')">Forgive</a>
+                    <form method="post" action="{% url 'reservations:forgive_penalty' pen.id %}" style="display:inline;" onsubmit="return confirm('Forgive this penalty? This cannot be undone.');">
+                      {% csrf_token %}
+                      <button type="submit" class="btn btn-xs btn-sm btn-outline-secondary py-0 px-1 small">Forgive</button>
+                    </form>
                     {% endif %}
                   </div>
                   {% endfor %}
@@ -1069,6 +1146,56 @@
                 {% endif %}
               </div>
             </div>
+            {% endif %}{# end can_manage_ventures penalty block #}
+
+            {# ── Add Damage Report (Ventures can also create damage reports) ── #}
+            {% if can_manage_ventures or can_view_all %}
+            <div class="card shadow-sm border-0 mb-4">
+              <div class="card-header bg-body-tertiary">
+                <h6 class="mb-0"><i class="bi bi-tools text-danger me-2"></i>Add Damage Report</h6>
+              </div>
+              <div class="card-body">
+                <form method="post" action="{% url 'reservations:ventures_create_damage' reservation.booking_reference %}">
+                  {% csrf_token %}
+                  <div class="mb-2">
+                    <input type="text" name="description" class="form-control form-control-sm" placeholder="Damage Description" required>
+                  </div>
+                  <div class="row g-2 mb-2">
+                    <div class="col-sm-6">
+                      <input type="number" step="0.01" name="amount" class="form-control form-control-sm" placeholder="Amount (₦)" required>
+                    </div>
+                    <div class="col-sm-6">
+                      <input type="text" name="affected_items" class="form-control form-control-sm" placeholder="Affected Items (optional)">
+                    </div>
+                  </div>
+                  <button type="submit" class="btn btn-outline-danger btn-sm">Create Damage Report</button>
+                </form>
+
+                {# Show existing damage reports #}
+                {% if reservation.damage_reports.all %}
+                <div class="mt-3 border-top pt-3">
+                  <div class="small fw-semibold mb-2">Existing Damage Reports</div>
+                  {% for dr in reservation.damage_reports.all %}
+                  <div class="d-flex justify-content-between align-items-center bg-body-tertiary p-2 rounded mb-1 small">
+                    <div>
+                      <span class="badge {% if dr.is_forgiven %}bg-secondary{% elif dr.is_paid %}bg-success{% else %}bg-danger{% endif %} me-2">
+                        {% if dr.is_forgiven %}Forgiven{% elif dr.is_paid %}Paid{% else %}Unpaid{% endif %}
+                      </span>
+                      {{ dr.description|truncatechars:40 }} — ₦{{ dr.amount }}
+                    </div>
+                    {% if not dr.is_forgiven and not dr.is_paid %}
+                    <form method="post" action="{% url 'reservations:forgive_damage' dr.id %}" style="display:inline;" onsubmit="return confirm('Forgive this damage report? This cannot be undone.');">
+                      {% csrf_token %}
+                      <button type="submit" class="btn btn-xs btn-sm btn-outline-secondary py-0 px-1 small">Forgive</button>
+                    </form>
+                    {% endif %}
+                  </div>
+                  {% endfor %}
+                </div>
+                {% endif %}
+              </div>
+            </div>
+            {% endif %}{# end ventures add damage block #}
 
             {# ── Coupon Management (only during PAYMENT_AUTHORIZATION stage) ── #}
             {% if reservation.case_status == BookingCaseStatus.PAYMENT_AUTHORIZATION %}
@@ -1141,6 +1268,55 @@
               <i class="bi bi-info-circle me-1"></i>
               No workflow actions are available for Facility at the current stage:
               <strong class="badge text-bg-{{ badge_variant }} ms-1">{{ badge_label }}</strong>.
+            </div>
+            {% endif %}
+
+            {# ── Facility: Add Damage Report ── #}
+            {% if can_manage_facility or can_view_all %}
+            <div class="card shadow-sm border-0 mb-4">
+              <div class="card-header bg-body-tertiary">
+                <h6 class="mb-0"><i class="bi bi-tools text-danger me-2"></i>Add Damage Report</h6>
+              </div>
+              <div class="card-body">
+                <form method="post" action="{% url 'reservations:facility_create_damage' reservation.booking_reference %}">
+                  {% csrf_token %}
+                  <div class="mb-2">
+                    <input type="text" name="description" class="form-control form-control-sm" placeholder="Damage Description" required>
+                  </div>
+                  <div class="row g-2 mb-2">
+                    <div class="col-sm-6">
+                      <input type="number" step="0.01" name="amount" class="form-control form-control-sm" placeholder="Amount (₦)" required>
+                    </div>
+                    <div class="col-sm-6">
+                      <input type="text" name="affected_items" class="form-control form-control-sm" placeholder="Affected Items (optional)">
+                    </div>
+                  </div>
+                  <button type="submit" class="btn btn-outline-danger btn-sm">Create Damage Report</button>
+                </form>
+
+                {# Show existing damage reports #}
+                {% if reservation.damage_reports.all %}
+                <div class="mt-3 border-top pt-3">
+                  <div class="small fw-semibold mb-2">Existing Damage Reports</div>
+                  {% for dr in reservation.damage_reports.all %}
+                  <div class="d-flex justify-content-between align-items-center bg-body-tertiary p-2 rounded mb-1 small">
+                    <div>
+                      <span class="badge {% if dr.is_forgiven %}bg-secondary{% elif dr.is_paid %}bg-success{% else %}bg-danger{% endif %} me-2">
+                        {% if dr.is_forgiven %}Forgiven{% elif dr.is_paid %}Paid{% else %}Unpaid{% endif %}
+                      </span>
+                      {{ dr.description|truncatechars:40 }} — ₦{{ dr.amount }}
+                    </div>
+                    {% if not dr.is_forgiven and not dr.is_paid %}
+                    <form method="post" action="{% url 'reservations:forgive_damage' dr.id %}" style="display:inline;" onsubmit="return confirm('Forgive this damage report? This cannot be undone.');">
+                      {% csrf_token %}
+                      <button type="submit" class="btn btn-xs btn-sm btn-outline-secondary py-0 px-1 small">Forgive</button>
+                    </form>
+                    {% endif %}
+                  </div>
+                  {% endfor %}
+                </div>
+                {% endif %}
+              </div>
             </div>
             {% endif %}
 
@@ -1295,5 +1471,24 @@ document.addEventListener("DOMContentLoaded", function() {
         toggleDamageSection(); // initial state
     }
 });
+
+// Function to handle proof form submissions (show loading state)
+function evmsShowUploadingState(form) {
+    const btn = form.querySelector('.evms-proof-submit-btn');
+    if (btn) {
+        btn.classList.add('disabled');
+        // We use pointer-events-none so the form still submits, but btn is unclickable
+        btn.style.pointerEvents = 'none';
+        
+        const label = btn.querySelector('.submit-label');
+        const loading = btn.querySelector('.submit-loading');
+        if (label && loading) {
+            label.classList.add('d-none');
+            loading.classList.remove('d-none');
+        }
+    }
+    // Scroll to top so user sees the message when page reloads
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+}
 </script>
 {% endblock %}

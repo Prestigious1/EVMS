@@ -893,6 +893,7 @@ def reservation_detail(request, booking_reference: str):
     from payments.models import PaymentProofStatus
     booking_proofs_pending = booking_proofs.filter(status=PaymentProofStatus.PENDING)
     damage_proofs_pending = damage_proofs.filter(status=PaymentProofStatus.PENDING)
+    has_pending_proofs = payment_proofs.filter(status=PaymentProofStatus.PENDING).exists()
     latest_booking_proof = booking_proofs.order_by("-uploaded_at").first()
     latest_damage_proof = damage_proofs.order_by("-uploaded_at").first()
 
@@ -959,6 +960,7 @@ def reservation_detail(request, booking_reference: str):
         "damage_proofs": damage_proofs,
         "latest_booking_proof": latest_booking_proof,
         "latest_damage_proof": latest_damage_proof,
+        "has_pending_proofs": has_pending_proofs,
         "successful_booking_payment": successful_booking_payment,
         "payment_auth": payment_auth,
         # Legacy compat
@@ -1268,6 +1270,29 @@ def forgive_penalty(request, penalty_id: int):
     return redirect("reservations:penalty_list")
 
 
+@login_required
+def forgive_damage(request, damage_id: int):
+    if not _can_manage_facility(request.user) and not _can_manage_ventures(request.user) and not can_view_all(request.user):
+        return HttpResponse(status=403)
+    if request.method != "POST":
+        return HttpResponse(status=405)
+
+    from reservations.models import DamageReport
+    damage = get_object_or_404(DamageReport, id=damage_id)
+    damage.is_forgiven = True
+    
+    from django.utils import timezone as tz
+    damage.waived_at = tz.now()
+    damage.waived_by = request.user
+    damage.save(update_fields=["is_forgiven", "waived_at", "waived_by"])
+
+    from reservations.signals import _sync_user_block_status
+    _sync_user_block_status(damage.user)
+
+    messages.success(request, f"Damage for {damage.user} has been forgiven.")
+    return redirect("reservations:detail", booking_reference=damage.reservation.booking_reference)
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 # Coupon Validation API & Application
 # ─────────────────────────────────────────────────────────────────────────────
@@ -1544,37 +1569,108 @@ def bursary_action(request, booking_reference: str):
 
     from payments.models import PaymentProof, PaymentProofStatus
     from django.utils import timezone
+    from reservations.models import BookingCaseStatus, DamageReport, Penalty
+
+    # Helper to check if booking is already past booking payment phase
+    past_booking_payment = reservation.case_status not in [
+        BookingCaseStatus.DRAFT, BookingCaseStatus.SUBMITTED, BookingCaseStatus.UNDER_VENTURES_REVIEW,
+        BookingCaseStatus.UNDER_FACILITY_REVIEW, BookingCaseStatus.FACILITY_APPROVED, BookingCaseStatus.PAYMENT_AUTHORIZATION,
+        BookingCaseStatus.AWAITING_PAYMENT, BookingCaseStatus.PAYMENT_SUBMITTED, BookingCaseStatus.UNDER_BURSARY_VERIFICATION,
+        BookingCaseStatus.PAYMENT_REJECTED
+    ]
+
+    # Helper to check if damage payment is already past the verification phase
+    past_damage_payment = reservation.case_status not in [
+        BookingCaseStatus.UNDER_DAMAGE_PAYMENT_VERIFICATION,
+        BookingCaseStatus.DAMAGE_PAYMENT_SUBMITTED,
+        BookingCaseStatus.AWAITING_DAMAGE_PAYMENT,
+    ]
+
+    from reservations.services import TransitionResult, _sync_user_block_from_damage
 
     if action == "verify_payment":
-        result = WorkflowService.bursary_verify_payment(
-            reservation=reservation, actor=request.user, notes=enhanced_notes
-        )
+        if past_booking_payment:
+            # Booking already moved forward (e.g. via online payment). Just clean up the proof.
+            result = TransitionResult(ok=True)
+        else:
+            result = WorkflowService.bursary_verify_payment(
+                reservation=reservation, actor=request.user, notes=enhanced_notes
+            )
+
         if result.ok:
             PaymentProof.objects.filter(reservation=reservation, status=PaymentProofStatus.PENDING, payment_type="BOOKING").update(
                 status=PaymentProofStatus.VERIFIED, verified_by=request.user, verified_at=timezone.now(), bursary_notes=notes
             )
     elif action == "reject_payment":
-        result = WorkflowService.bursary_reject_payment(
-            reservation=reservation, actor=request.user, notes=enhanced_notes
-        )
+        if past_booking_payment:
+            result = TransitionResult(ok=True)
+        else:
+            result = WorkflowService.bursary_reject_payment(
+                reservation=reservation, actor=request.user, notes=enhanced_notes
+            )
+
         if result.ok:
             PaymentProof.objects.filter(reservation=reservation, status=PaymentProofStatus.PENDING, payment_type="BOOKING").update(
                 status=PaymentProofStatus.REJECTED, verified_by=request.user, verified_at=timezone.now(), bursary_notes=notes
             )
     elif action == "verify_damage_payment":
-        result = WorkflowService.bursary_verify_damage_payment(
-            reservation=reservation, actor=request.user, notes=enhanced_notes
-        )
-        if result.ok:
+        if past_damage_payment:
+            # Damage already processed (case moved on). Just mark any remaining pending proofs
+            # as verified, ensure damage is marked paid, and sync user block.
             PaymentProof.objects.filter(reservation=reservation, status=PaymentProofStatus.PENDING, payment_type="DAMAGE").update(
                 status=PaymentProofStatus.VERIFIED, verified_by=request.user, verified_at=timezone.now(), bursary_notes=notes
             )
+            DamageReport.objects.filter(reservation=reservation, is_paid=False, is_forgiven=False).update(is_paid=True)
+            _sync_user_block_from_damage(reservation.user)
+            result = TransitionResult(ok=True)
+        else:
+            result = WorkflowService.bursary_verify_damage_payment(
+                reservation=reservation, actor=request.user, notes=enhanced_notes
+            )
+            if result.ok:
+                PaymentProof.objects.filter(reservation=reservation, status=PaymentProofStatus.PENDING, payment_type="DAMAGE").update(
+                    status=PaymentProofStatus.VERIFIED, verified_by=request.user, verified_at=timezone.now(), bursary_notes=notes
+                )
     elif action == "reject_damage_payment":
-        result = WorkflowService.bursary_reject_damage_payment(
+        if past_damage_payment:
+            # Already processed — silently succeed (cannot reject an already-verified payment)
+            result = TransitionResult(ok=True)
+        else:
+            result = WorkflowService.bursary_reject_damage_payment(
+                reservation=reservation, actor=request.user, notes=enhanced_notes
+            )
+            if result.ok:
+                PaymentProof.objects.filter(reservation=reservation, status=PaymentProofStatus.PENDING, payment_type="DAMAGE").update(
+                    status=PaymentProofStatus.REJECTED, verified_by=request.user, verified_at=timezone.now(), bursary_notes=notes
+                )
+    elif action == "verify_penalty_payment":
+        # Check if ALL penalties are already resolved (paid or forgiven)
+        has_unpaid_penalties = Penalty.objects.filter(
+            reservation=reservation, is_paid=False, is_forgiven=False
+        ).exists()
+        has_pending_penalty_proofs = PaymentProof.objects.filter(
+            reservation=reservation, status=PaymentProofStatus.PENDING, payment_type="PENALTY"
+        ).exists()
+
+        if not has_unpaid_penalties and not has_pending_penalty_proofs:
+            # Nothing to process — silently succeed
+            result = TransitionResult(ok=True)
+        else:
+            result = WorkflowService.bursary_verify_penalty_payment(
+                reservation=reservation, actor=request.user, notes=enhanced_notes
+            )
+            if result.ok:
+                PaymentProof.objects.filter(reservation=reservation, status=PaymentProofStatus.PENDING, payment_type="PENALTY").update(
+                    status=PaymentProofStatus.VERIFIED, verified_by=request.user, verified_at=timezone.now(), bursary_notes=notes
+                )
+                # Ensure user block is released
+                _sync_user_block_from_damage(reservation.user)
+    elif action == "reject_penalty_payment":
+        result = WorkflowService.bursary_reject_penalty_payment(
             reservation=reservation, actor=request.user, notes=enhanced_notes
         )
         if result.ok:
-            PaymentProof.objects.filter(reservation=reservation, status=PaymentProofStatus.PENDING, payment_type="DAMAGE").update(
+            PaymentProof.objects.filter(reservation=reservation, status=PaymentProofStatus.PENDING, payment_type="PENALTY").update(
                 status=PaymentProofStatus.REJECTED, verified_by=request.user, verified_at=timezone.now(), bursary_notes=notes
             )
     elif action == "request_clarification":
@@ -1667,6 +1763,15 @@ def submit_payment_proof(request, booking_reference: str):
     except Exception:
         amount_claimed = Decimal("0")
 
+    from payments.models import Payment, PaymentStatus
+    existing_payment = Payment.objects.filter(
+        reservation=reservation,
+        user=request.user,
+        status=PaymentStatus.PENDING,
+        damage_report__isnull=True,
+        penalty__isnull=True,
+    ).order_by("-created_at").first()
+
     try:
         PaymentResolutionService.finalize_payment(
             reservation=reservation,
@@ -1676,7 +1781,8 @@ def submit_payment_proof(request, booking_reference: str):
             transaction_reference=transaction_ref,
             actor=request.user,
             proof_file=receipt_file,
-            payment_type=PaymentProofType.BOOKING
+            payment_type=PaymentProofType.BOOKING,
+            existing_payment=existing_payment
         )
         messages.success(request, "Payment proof submitted. Awaiting Bursary verification.")
     except Exception as e:
@@ -1699,7 +1805,10 @@ def submit_damage_payment_proof(request, booking_reference: str):
         return redirect("reservations:detail", booking_reference=booking_reference)
 
     receipt_file = request.FILES.get("receipt_file")
+    import uuid
     transaction_ref = (request.POST.get("transaction_ref") or "").strip()
+    if not transaction_ref:
+        transaction_ref = f"MANUAL-{uuid.uuid4().hex[:8].upper()}"
     amount_claimed_str = request.POST.get("amount_claimed") or "0"
 
     if not receipt_file:
@@ -1713,6 +1822,14 @@ def submit_damage_payment_proof(request, booking_reference: str):
     except Exception:
         amount_claimed = Decimal("0")
 
+    from payments.models import Payment, PaymentStatus
+    existing_payment = Payment.objects.filter(
+        reservation=reservation,
+        user=request.user,
+        status=PaymentStatus.PENDING,
+        damage_report__isnull=False,
+    ).order_by("-created_at").first()
+
     try:
         PaymentResolutionService.finalize_payment(
             reservation=reservation,
@@ -1722,9 +1839,62 @@ def submit_damage_payment_proof(request, booking_reference: str):
             transaction_reference=transaction_ref,
             actor=request.user,
             proof_file=receipt_file,
-            payment_type=PaymentProofType.DAMAGE
+            payment_type=PaymentProofType.DAMAGE,
+            existing_payment=existing_payment
         )
-        messages.success(request, "Damage payment proof submitted. Awaiting Bursary verification.")
+        messages.success(request, "Damage payment proof submitted successfully. Awaiting Bursary verification.")
+    except Exception as e:
+        messages.warning(request, f"Proof uploaded but workflow update failed: {e}")
+    return redirect("reservations:detail", booking_reference=booking_reference)
+
+
+@login_required
+def submit_penalty_payment_proof(request, booking_reference: str):
+    """Applicant uploads penalty payment receipt."""
+    if request.method != "POST":
+        return HttpResponse(status=405)
+
+    reservation = get_object_or_404(Reservation, booking_reference=booking_reference, user=request.user)
+
+    receipt_file = request.FILES.get("receipt_file")
+    import uuid
+    transaction_ref = (request.POST.get("transaction_ref") or "").strip()
+    if not transaction_ref:
+        transaction_ref = f"MANUAL-{uuid.uuid4().hex[:8].upper()}"
+    amount_claimed_str = request.POST.get("amount_claimed") or "0"
+
+    if not receipt_file:
+        messages.error(request, "Please upload a penalty payment receipt.")
+        return redirect("reservations:detail", booking_reference=booking_reference)
+
+    from payments.services import PaymentResolutionService
+    from payments.models import PaymentMethod, PaymentProofType
+    try:
+        amount_claimed = Decimal(amount_claimed_str)
+    except Exception:
+        amount_claimed = Decimal("0")
+
+    from payments.models import Payment, PaymentStatus
+    existing_payment = Payment.objects.filter(
+        reservation=reservation,
+        user=request.user,
+        status=PaymentStatus.PENDING,
+        penalty__isnull=False,
+    ).order_by("-created_at").first()
+
+    try:
+        PaymentResolutionService.finalize_payment(
+            reservation=reservation,
+            amount=amount_claimed,
+            method=PaymentMethod.TRANSFER,
+            provider="MANUAL",
+            transaction_reference=transaction_ref,
+            actor=request.user,
+            proof_file=receipt_file,
+            payment_type=PaymentProofType.PENALTY,
+            existing_payment=existing_payment
+        )
+        messages.success(request, "Penalty payment proof submitted successfully. Awaiting Bursary verification.")
     except Exception as e:
         messages.warning(request, f"Proof uploaded but workflow update failed: {e}")
     return redirect("reservations:detail", booking_reference=booking_reference)
@@ -2256,6 +2426,59 @@ def admin_forgive_liability_view(request, booking_reference: str):
     else:
         messages.error(request, result.error or "Failed to forgive liability.")
 
+    return redirect(request.META.get("HTTP_REFERER") or "reservations:detail", booking_reference=booking_reference)
+
+
+@login_required
+def facility_create_damage(request, booking_reference: str):
+    """
+    POST: Facility or Ventures creates a DamageReport on a booking.
+    Ventures can also create damage (per policy). Facility can create damage only.
+    """
+    if not _can_manage_facility(request.user) and not _can_manage_ventures(request.user) and not _can_view_all(request.user):
+        return HttpResponse(status=403)
+    if request.method != "POST":
+        return HttpResponse(status=405)
+
+    reservation = get_object_or_404(Reservation, booking_reference=booking_reference)
+    description = (request.POST.get("description") or "").strip()
+    amount_str = (request.POST.get("amount") or "").strip()
+    affected_items = (request.POST.get("affected_items") or "").strip()
+
+    if not description:
+        messages.error(request, "Damage description is required.")
+        return redirect(request.META.get("HTTP_REFERER") or "reservations:detail", booking_reference=booking_reference)
+
+    try:
+        amount = Decimal(amount_str)
+        if amount < 0:
+            raise ValueError("Amount cannot be negative.")
+    except Exception:
+        messages.error(request, "Invalid damage amount.")
+        return redirect(request.META.get("HTTP_REFERER") or "reservations:detail", booking_reference=booking_reference)
+
+    from reservations.models import DamageReport
+    damage = DamageReport.objects.create(
+        reservation=reservation,
+        user=reservation.user,
+        amount=amount,
+        description=description,
+        affected_items=affected_items,
+    )
+
+    from core.models import AuditLog
+    create_audit_log(
+        user=request.user,
+        action=f"facility_create_damage:{booking_reference}",
+        model_name="DamageReport",
+        object_repr=str(damage),
+        new_value=f"₦{amount} — {description}",
+    )
+
+    from reservations.signals import _sync_user_block_status
+    _sync_user_block_status(reservation.user)
+
+    messages.success(request, f"Damage report created for ₦{amount}.")
     return redirect(request.META.get("HTTP_REFERER") or "reservations:detail", booking_reference=booking_reference)
 
 

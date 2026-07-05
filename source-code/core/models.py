@@ -8,16 +8,29 @@ class AuditLog(models.Model):
         settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True
     )
     role = models.CharField(max_length=30, blank=True)
+    department = models.CharField(max_length=200, blank=True, help_text="Department of the acting user")
     action = models.CharField(max_length=255)
     model_name = models.CharField(max_length=120)
     object_repr = models.CharField(max_length=255, blank=True)
+    affected_module = models.CharField(max_length=100, blank=True, help_text="App/module where action occurred")
     old_value = models.TextField(blank=True)
     new_value = models.TextField(blank=True)
+    reason = models.TextField(blank=True, help_text="Reason for the action if provided")
+    comments = models.TextField(blank=True, help_text="Additional context or comments")
     ip_address = models.GenericIPAddressField(null=True, blank=True)
+    browser = models.CharField(max_length=200, blank=True, help_text="Browser used by the actor")
+    os_info = models.CharField(max_length=200, blank=True, help_text="Operating system of the actor")
+    request_id = models.CharField(max_length=64, blank=True, help_text="Unique ID for the HTTP request")
     timestamp = models.DateTimeField(auto_now_add=True)
 
     class Meta:
         ordering = ["-timestamp"]
+        indexes = [
+            models.Index(fields=["user", "timestamp"]),
+            models.Index(fields=["model_name", "timestamp"]),
+            models.Index(fields=["action", "timestamp"]),
+            models.Index(fields=["affected_module", "timestamp"]),
+        ]
 
     def __str__(self) -> str:
         return f"{self.timestamp} | {self.model_name} | {self.action}"
@@ -93,3 +106,32 @@ class Announcement(models.Model):
 
     def __str__(self) -> str:
         return self.title
+
+
+class AcademicPeriod(models.Model):
+    """Represents an academic session or semester for report date-range presets."""
+
+    class PeriodType(models.TextChoices):
+        SESSION  = "SESSION",  "Academic Session"
+        SEMESTER = "SEMESTER", "Semester"
+
+    name       = models.CharField(max_length=100, help_text="e.g. '2025/2026 Session' or 'Second Semester 2025'")
+    period_type = models.CharField(max_length=20, choices=PeriodType.choices, default=PeriodType.SESSION)
+    start_date = models.DateField()
+    end_date   = models.DateField()
+    is_current = models.BooleanField(default=False, help_text="Mark the active period for default filter selection")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-start_date"]
+
+    def __str__(self) -> str:
+        return f"{self.name} ({self.start_date} — {self.end_date})"
+
+    def save(self, *args, **kwargs):
+        # Ensure only one current period per type
+        if self.is_current:
+            AcademicPeriod.objects.filter(
+                period_type=self.period_type, is_current=True
+            ).exclude(pk=self.pk).update(is_current=False)
+        super().save(*args, **kwargs)

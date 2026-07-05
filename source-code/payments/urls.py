@@ -21,6 +21,8 @@ urlpatterns = [
     path("record-manual/", views.record_manual_payment, name="record_manual_payment"),
     # Enterprise receipt (system-generated official financial document)
     path("receipt/<str:booking_reference>/", views.enterprise_receipt_pdf, name="enterprise_receipt_pdf"),
+    path("receipt/damage/<int:damage_id>/", views.damage_receipt_pdf, name="damage_receipt_pdf"),
+    path("receipt/penalty/<int:penalty_id>/", views.penalty_receipt_pdf, name="penalty_receipt_pdf"),
     # Bursary payment review (redesigned full review page)
     path("bursary-review/<str:booking_reference>/", views.bursary_payment_review, name="bursary_payment_review"),
     # Coupon management

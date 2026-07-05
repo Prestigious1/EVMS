@@ -1284,24 +1284,36 @@ class WorkflowService:
                 actor=actor,
             )
             # Mark damage report as paid
-            from reservations.models import DamageReport
+            from reservations.models import DamageReport, Penalty
             DamageReport.objects.filter(reservation=reservation, is_paid=False, is_forgiven=False).update(is_paid=True)
             # Release user block
             _sync_user_block_from_damage(reservation.user)
-            # Close the case
-            cls.transition(
-                reservation=reservation,
-                to_status=BookingCaseStatus.CASE_CLOSED,
-                actor=None,
-                notes="System: damage resolved. Case closed.",
-            )
-            _add_timeline(
-                reservation=reservation,
-                event_type=TimelineEventType.CASE_CLOSED,
-                title="Case Closed — Damage Resolved",
-                description="All damages paid. Case formally closed. Applicant is eligible for future bookings.",
-                actor=None,
-            )
+            # Only close the case if there are no outstanding (unpaid, unforgiven) penalties
+            has_pending_penalties = Penalty.objects.filter(
+                reservation=reservation, is_paid=False, is_forgiven=False
+            ).exists()
+            if not has_pending_penalties:
+                cls.transition(
+                    reservation=reservation,
+                    to_status=BookingCaseStatus.CASE_CLOSED,
+                    actor=None,
+                    notes="System: damage resolved. Case closed.",
+                )
+                _add_timeline(
+                    reservation=reservation,
+                    event_type=TimelineEventType.CASE_CLOSED,
+                    title="Case Closed — Damage Resolved",
+                    description="All damages paid. Case formally closed. Applicant is eligible for future bookings.",
+                    actor=None,
+                )
+            else:
+                _add_timeline(
+                    reservation=reservation,
+                    event_type=TimelineEventType.DAMAGE_PAYMENT_VERIFIED,
+                    title="Damage Payment Verified — Penalties Still Outstanding",
+                    description="Damage payment cleared. Outstanding penalty payments must still be settled before case closure.",
+                    actor=actor,
+                )
         return result
 
     @classmethod
@@ -1321,6 +1333,71 @@ class WorkflowService:
                 actor=actor,
             )
         return result
+
+    @classmethod
+    def bursary_verify_penalty_payment(cls, *, reservation: Reservation, actor=None, notes: str = "") -> TransitionResult:
+        """Bursary confirms a penalty payment proof — marks penalty as paid and releases restriction."""
+        from reservations.models import Penalty
+        with transaction.atomic():
+            # Mark all unpaid, non-forgiven penalties as paid
+            Penalty.objects.filter(reservation=reservation, is_paid=False, is_forgiven=False).update(is_paid=True)
+            # Release user block
+            _sync_user_block_from_damage(reservation.user)
+            # Log and timeline
+            BookingLog.objects.create(
+                reservation=reservation,
+                actor=actor,
+                action="bursary_verify_penalty_payment",
+                details=notes,
+            )
+            create_audit_log(
+                user=actor,
+                action=f"bursary_verify_penalty_payment:{reservation.booking_reference}",
+                model_name="Reservation",
+                object_repr=str(reservation),
+                new_value=notes or "Penalty payment verified.",
+            )
+            _add_timeline(
+                reservation=reservation,
+                event_type=TimelineEventType.DAMAGE_PAYMENT_VERIFIED,
+                title="Penalty Payment Verified",
+                description=notes or "Bursary verified penalty payment. Booking restriction released.",
+                actor=actor,
+            )
+            _add_timeline(
+                reservation=reservation,
+                event_type=TimelineEventType.RESTRICTION_REMOVED,
+                title="User Restriction Removed",
+                description=f"Penalty paid and verified. Restriction removed for {reservation.user.get_full_name() or reservation.user.email}.",
+                actor=actor,
+            )
+        return TransitionResult(ok=True)
+
+    @classmethod
+    def bursary_reject_penalty_payment(cls, *, reservation: Reservation, actor=None, notes: str = "") -> TransitionResult:
+        """Bursary rejects a penalty payment proof — applicant must re-upload."""
+        with transaction.atomic():
+            BookingLog.objects.create(
+                reservation=reservation,
+                actor=actor,
+                action="bursary_reject_penalty_payment",
+                details=notes,
+            )
+            create_audit_log(
+                user=actor,
+                action=f"bursary_reject_penalty_payment:{reservation.booking_reference}",
+                model_name="Reservation",
+                object_repr=str(reservation),
+                new_value=notes or "Penalty payment proof rejected.",
+            )
+            _add_timeline(
+                reservation=reservation,
+                event_type=TimelineEventType.PAYMENT_REJECTED,
+                title="Penalty Payment Proof Rejected",
+                description=notes or "Bursary rejected the penalty payment proof. Applicant must re-upload.",
+                actor=actor,
+            )
+        return TransitionResult(ok=True)
 
     # =========================================================================
     # Admin Exceptions

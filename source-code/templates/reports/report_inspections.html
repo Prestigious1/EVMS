@@ -1,0 +1,90 @@
+{% extends "reports/bi_base.html" %}
+{% load static %}
+
+{% block title %}Inspection Report{% endblock %}
+{% block nav_reports_inspections %}active{% endblock %}
+
+{% block bi_title %}Hall Inspection Report{% endblock %}
+{% block bi_subtitle %}Monitor pre- and post-event hall inspections{% endblock %}
+{% block bi_icon %}bi-clipboard-check{% endblock %}
+
+{% block bi_custom_filters %}
+<div class="col-12 col-md-2">
+  <label class="form-label small text-muted mb-1">Status</label>
+  <select name="status" class="form-select form-select-sm">
+    <option value="">All Statuses</option>
+    <option value="PENDING" {% if request.GET.status == 'PENDING' %}selected{% endif %}>Pending</option>
+    <option value="COMPLETED" {% if request.GET.status == 'COMPLETED' %}selected{% endif %}>Completed</option>
+  </select>
+</div>
+{% endblock %}
+
+{% block bi_content %}
+<div class="row g-3 mb-4">
+  <div class="col-12 col-md-6">
+    <div class="kpi-card border-info">
+      <div class="kpi-value">{{ total_count }}</div>
+      <div class="kpi-label">Total Inspections</div>
+    </div>
+  </div>
+  <div class="col-12 col-md-6">
+    <div class="kpi-card border-warning">
+      <div class="kpi-value">{{ pending_count }}</div>
+      <div class="kpi-label">Pending Inspections</div>
+    </div>
+  </div>
+</div>
+
+<div class="analytics-card overflow-hidden">
+  <div class="table-responsive">
+    <table class="table table-borderless bi-table mb-0">
+      <thead>
+        <tr>
+          <th>Reference</th>
+          <th>Hall</th>
+          <th>Scheduled For</th>
+          <th>Type</th>
+          <th>Status</th>
+          <th>Inspector</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for insp in page_obj %}
+        <tr>
+          <td class="fw-bold">{{ insp.reservation.booking_reference }}</td>
+          <td>{{ insp.reservation.hall.name }}</td>
+          <td>{{ insp.scheduled_date|date:"M d, Y" }}</td>
+          <td><span class="badge bg-secondary">{{ insp.get_inspection_type_display }}</span></td>
+          <td>
+            {% if insp.status == 'COMPLETED' %}
+              <span class="badge bg-success">Completed</span>
+            {% else %}
+              <span class="badge bg-warning">Pending</span>
+            {% endif %}
+          </td>
+          <td>{{ insp.inspector.email|default:"Unassigned" }}</td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="6" class="text-center py-4 text-muted">No inspections found.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  
+  {% if page_obj.has_other_pages %}
+  <div class="mt-4 d-flex justify-content-end">
+    <nav aria-label="Page navigation">
+      <ul class="pagination pagination-sm">
+        {% if page_obj.has_previous %}
+        <li class="page-item"><a class="page-link" href="?{% for key, value in request.GET.items %}{% if key != 'page' %}{{ key }}={{ value }}&{% endif %}{% endfor %}page={{ page_obj.previous_page_number }}">Prev</a></li>
+        {% endif %}
+        <li class="page-item active"><span class="page-link">{{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span></li>
+        {% if page_obj.has_next %}
+        <li class="page-item"><a class="page-link" href="?{% for key, value in request.GET.items %}{% if key != 'page' %}{{ key }}={{ value }}&{% endif %}{% endfor %}page={{ page_obj.next_page_number }}">Next</a></li>
+        {% endif %}
+      </ul>
+    </nav>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

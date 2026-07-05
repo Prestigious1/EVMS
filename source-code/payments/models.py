@@ -102,6 +102,7 @@ class Payment(models.Model):
 class PaymentProofType(models.TextChoices):
     BOOKING = "BOOKING", "Booking Payment"
     DAMAGE  = "DAMAGE",  "Damage Payment"
+    PENALTY = "PENALTY", "Penalty Payment"
 
 
 class PaymentProofStatus(models.TextChoices):

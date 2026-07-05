@@ -38,6 +38,7 @@ urlpatterns = [
     # Payment proof submission (applicant)
     path("payment-proof/<str:booking_reference>/", views.submit_payment_proof, name="submit_payment_proof"),
     path("damage-payment-proof/<str:booking_reference>/", views.submit_damage_payment_proof, name="submit_damage_payment_proof"),
+    path("penalty-payment-proof/<str:booking_reference>/", views.submit_penalty_payment_proof, name="submit_penalty_payment_proof"),
 
     # Inspection
     path("inspection/<str:booking_reference>/", views.record_inspection, name="record_inspection"),
@@ -46,7 +47,10 @@ urlpatterns = [
     # Penalty management
     path("penalties/", views.penalty_list, name="penalty_list"),
     path("penalty/<int:penalty_id>/forgive/", views.forgive_penalty, name="forgive_penalty"),
+    path("damage/<int:damage_id>/forgive/", views.forgive_damage, name="forgive_damage"),
     path("ventures/penalty/create/<str:booking_reference>/", views.ventures_create_penalty_view, name="ventures_create_penalty"),
+    path("facility/damage/create/<str:booking_reference>/", views.facility_create_damage, name="facility_create_damage"),
+    path("ventures/damage/create/<str:booking_reference>/", views.facility_create_damage, name="ventures_create_damage"),
 
     # Coupon validation & application
     path("coupon/validate/", views.validate_coupon, name="validate_coupon"),

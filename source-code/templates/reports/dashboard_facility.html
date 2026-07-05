@@ -1,0 +1,176 @@
+{% extends "reports/bi_base.html" %}
+{% load static %}
+
+{% block title %}Facility Dashboard{% endblock %}
+{% block nav_reports_facility_dashboard %}active{% endblock %}
+
+{% block bi_title %}Facility Overview{% endblock %}
+{% block bi_subtitle %}Hall utilisation, inspections & maintenance{% endblock %}
+{% block bi_icon %}bi-building-gear{% endblock %}
+
+{% block bi_filters %}{% endblock %}
+
+{% block bi_content %}
+<div class="row g-3 mb-4">
+  <div class="col-6 col-md-3">
+    <div class="kpi-card">
+      <div class="kpi-icon text-info bg-info bg-opacity-10"><i class="bi bi-inbox"></i></div>
+      <div class="kpi-value">{{ pending_facility_review }}</div>
+      <div class="kpi-label">Pending Review</div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="kpi-card">
+      <div class="kpi-icon text-primary bg-primary bg-opacity-10"><i class="bi bi-calendar-event"></i></div>
+      <div class="kpi-value">{{ upcoming_events }}</div>
+      <div class="kpi-label">Upcoming (7 days)</div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="kpi-card">
+      <div class="kpi-icon text-warning bg-warning bg-opacity-10"><i class="bi bi-clipboard-check"></i></div>
+      <div class="kpi-value">{{ inspection_queue }}</div>
+      <div class="kpi-label">Pending Inspections</div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="kpi-card">
+      <div class="kpi-icon text-danger bg-danger bg-opacity-10"><i class="bi bi-tools"></i></div>
+      <div class="kpi-value">{{ damage_pending }}</div>
+      <div class="kpi-label">Damage Issues</div>
+    </div>
+  </div>
+</div>
+
+<div class="row g-4 mb-4">
+  <div class="col-12 col-lg-8">
+    <div class="analytics-card">
+      <h6 class="text-uppercase text-muted fw-bold mb-4">Hall Utilisation (Top 8 - Current Year)</h6>
+      <div class="chart-container">
+        <canvas id="hallChart"></canvas>
+      </div>
+    </div>
+  </div>
+  <div class="col-12 col-lg-4">
+    <div class="analytics-card">
+      <h6 class="text-uppercase text-muted fw-bold mb-4">Hall Status Overview</h6>
+      <ul class="list-group list-group-flush bg-transparent mb-4">
+        <li class="list-group-item bg-transparent d-flex justify-content-between align-items-center">
+          Active Halls
+          <span class="badge bg-success rounded-pill">{{ halls_active }}</span>
+        </li>
+        <li class="list-group-item bg-transparent d-flex justify-content-between align-items-center">
+          Inactive / Maintenance
+          <span class="badge bg-warning rounded-pill">{{ halls_inactive }}</span>
+        </li>
+        <li class="list-group-item bg-transparent d-flex justify-content-between align-items-center">
+          Archived
+          <span class="badge bg-secondary rounded-pill">{{ halls_archived }}</span>
+        </li>
+        <li class="list-group-item bg-transparent d-flex justify-content-between align-items-center">
+          Currently Blocked
+          <span class="badge bg-danger rounded-pill">{{ blocked_halls }}</span>
+        </li>
+      </ul>
+      <a href="{% url 'reports:report_halls' %}" class="btn btn-outline-primary btn-sm w-100">View Full Hall Report</a>
+    </div>
+  </div>
+</div>
+
+<div class="row g-4">
+  <div class="col-12 col-lg-6">
+    <div class="analytics-card overflow-hidden">
+      <div class="d-flex justify-content-between align-items-center mb-4">
+        <h6 class="text-uppercase text-muted fw-bold mb-0">Upcoming Schedule (14 Days)</h6>
+      </div>
+      <div class="table-responsive">
+        <table class="table table-borderless bi-table mb-0">
+          <thead>
+            <tr>
+              <th>Date</th>
+              <th>Hall</th>
+              <th>Applicant</th>
+              <th>Time</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for booking in upcoming_list %}
+            <tr>
+              <td class="text-nowrap">{{ booking.booking_date|date:"M d, Y" }}</td>
+              <td class="fw-bold">{{ booking.hall.name }}</td>
+              <td>{{ booking.user.email }}</td>
+              <td class="text-nowrap">{{ booking.start_time|date:"H:i" }} - {{ booking.end_time|date:"H:i" }}</td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="4" class="text-center text-muted">No upcoming bookings</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+  
+  <div class="col-12 col-lg-6">
+    <div class="analytics-card overflow-hidden">
+      <h6 class="text-uppercase text-muted fw-bold mb-4">Active Blocks & Maintenance</h6>
+      <div class="table-responsive">
+        <table class="table table-borderless bi-table mb-0">
+          <thead>
+            <tr>
+              <th>Hall</th>
+              <th>Start Date</th>
+              <th>End Date</th>
+              <th>Reason</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for block in active_blocks %}
+            <tr>
+              <td class="fw-bold">{{ block.hall.name }}</td>
+              <td class="text-nowrap">{{ block.start_date|date:"M d, Y" }}</td>
+              <td class="text-nowrap">{{ block.end_date|date:"M d, Y" }}</td>
+              <td>{{ block.reason|truncatechars:30 }}</td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="4" class="text-center text-muted">No active blocks</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block bi_scripts %}
+<script>
+document.addEventListener("DOMContentLoaded", function() {
+  const c = getThemeColors();
+  
+  // 1. Hall Chart (Bar)
+  const ctxHall = document.getElementById('hallChart');
+  if(ctxHall) {
+    new Chart(ctxHall, {
+      type: 'bar',
+      data: {
+        labels: {{ hall_labels|safe }},
+        datasets: [{
+          label: 'Bookings',
+          data: {{ hall_counts|safe }},
+          backgroundColor: '#60a5fa',
+          borderRadius: 4
+        }]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: {
+          x: { grid: { display: false } },
+          y: { grid: { color: c.gridColor }, beginAtZero: true }
+        }
+      }
+    });
+  }
+});
+</script>
+{% endblock %}

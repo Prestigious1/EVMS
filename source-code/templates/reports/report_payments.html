@@ -1,0 +1,104 @@
+{% extends "reports/bi_base.html" %}
+{% load static %}
+
+{% block title %}Payment Report{% endblock %}
+{% block nav_reports_payments %}active{% endblock %}
+
+{% block bi_title %}Payment Proofs Report{% endblock %}
+{% block bi_subtitle %}Analyze submitted payment proofs by type and status{% endblock %}
+{% block bi_icon %}bi-receipt{% endblock %}
+
+{% block bi_custom_filters %}
+<div class="col-12 col-md-2">
+  <label class="form-label small text-muted mb-1">Status</label>
+  <select name="status" class="form-select form-select-sm">
+    <option value="">All Statuses</option>
+    <option value="PENDING" {% if request.GET.status == 'PENDING' %}selected{% endif %}>Pending</option>
+    <option value="VERIFIED" {% if request.GET.status == 'VERIFIED' %}selected{% endif %}>Verified</option>
+    <option value="REJECTED" {% if request.GET.status == 'REJECTED' %}selected{% endif %}>Rejected</option>
+  </select>
+</div>
+
+<div class="col-12 col-md-2">
+  <label class="form-label small text-muted mb-1">Type</label>
+  <select name="payment_type" class="form-select form-select-sm">
+    <option value="">All Types</option>
+    <option value="BOOKING_FEE" {% if request.GET.payment_type == 'BOOKING_FEE' %}selected{% endif %}>Booking Fee</option>
+    <option value="DAMAGE" {% if request.GET.payment_type == 'DAMAGE' %}selected{% endif %}>Damage Fee</option>
+    <option value="PENALTY" {% if request.GET.payment_type == 'PENALTY' %}selected{% endif %}>Penalty</option>
+  </select>
+</div>
+{% endblock %}
+
+{% block bi_content %}
+<div class="row g-3 mb-4">
+  <div class="col-12 col-md-6">
+    <div class="kpi-card border-primary">
+      <div class="kpi-value">{{ total_count }}</div>
+      <div class="kpi-label">Total Submissions</div>
+    </div>
+  </div>
+  <div class="col-12 col-md-6">
+    <div class="kpi-card border-success">
+      <div class="kpi-value">₦{{ total_claimed|floatformat:0 }}</div>
+      <div class="kpi-label">Total Amount Claimed</div>
+    </div>
+  </div>
+</div>
+
+<div class="analytics-card overflow-hidden">
+  <div class="table-responsive">
+    <table class="table table-borderless bi-table mb-0">
+      <thead>
+        <tr>
+          <th>Uploaded</th>
+          <th>Reference</th>
+          <th>Applicant</th>
+          <th>Type</th>
+          <th>Claimed (₦)</th>
+          <th>Status</th>
+          <th>Verified By</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for proof in page_obj %}
+        <tr>
+          <td class="text-nowrap">{{ proof.uploaded_at|date:"M d, H:i" }}</td>
+          <td class="fw-bold">{{ proof.reservation.booking_reference|default:"-" }}</td>
+          <td>{{ proof.uploaded_by.email }}</td>
+          <td><span class="badge bg-secondary">{{ proof.payment_type }}</span></td>
+          <td class="text-end fw-bold">{{ proof.amount_claimed|floatformat:0 }}</td>
+          <td>
+            <span class="badge 
+              {% if proof.status == 'VERIFIED' %}bg-success
+              {% elif proof.status == 'REJECTED' %}bg-danger
+              {% else %}bg-warning{% endif %}">
+              {{ proof.status }}
+            </span>
+          </td>
+          <td>{{ proof.verified_by.email|default:"-" }}</td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="7" class="text-center py-4 text-muted">No payment proofs found.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  
+  {% if page_obj.has_other_pages %}
+  <div class="mt-4 d-flex justify-content-end">
+    <nav aria-label="Page navigation">
+      <ul class="pagination pagination-sm">
+        {% if page_obj.has_previous %}
+        <li class="page-item"><a class="page-link" href="?{% for key, value in request.GET.items %}{% if key != 'page' %}{{ key }}={{ value }}&{% endif %}{% endfor %}page={{ page_obj.previous_page_number }}">Prev</a></li>
+        {% endif %}
+        <li class="page-item active"><span class="page-link">{{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span></li>
+        {% if page_obj.has_next %}
+        <li class="page-item"><a class="page-link" href="?{% for key, value in request.GET.items %}{% if key != 'page' %}{{ key }}={{ value }}&{% endif %}{% endfor %}page={{ page_obj.next_page_number }}">Next</a></li>
+        {% endif %}
+      </ul>
+    </nav>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

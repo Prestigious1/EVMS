@@ -1225,15 +1225,35 @@
     {% endif %}
     {% endif %}
 
-    <!-- Reports -->
+    <!-- Analytics & BI -->
     {% if request.user|has_capability:"view_reports" %}
-    <div class="sidebar-section-label">Analytics</div>
-    <a class="sidebar-item {% block nav_reports %}{% endblock %}" href="{% url 'reports:dashboard' %}">
-      <i class="bi bi-graph-up-arrow si-icon"></i> Dashboard
+    <div class="sidebar-section-label">Enterprise BI</div>
+    <a class="sidebar-item {% block nav_reports_dashboard %}{% endblock %}" href="{% url 'reports:dashboard' %}">
+      <i class="bi bi-pie-chart si-icon"></i> Role Dashboard
     </a>
-    <a class="sidebar-item" href="{% url 'reports:report_centre' %}">
-      <i class="bi bi-journal-text si-icon"></i> Report Centre
-    </a>
+    <div class="sidebar-group" id="sgAnalytics">
+      <button class="sidebar-group-trigger" data-target="sgAnalyticsBody">
+        <i class="bi bi-graph-up-arrow si-icon"></i> Analytics
+        <i class="bi bi-chevron-down sg-caret"></i>
+      </button>
+      <div class="sidebar-group-body" id="sgAnalyticsBody">
+        <a class="sidebar-item {% block nav_reports_bookings %}{% endblock %}" href="{% url 'reports:report_bookings' %}">
+          <i class="bi bi-calendar-check si-icon"></i> Bookings
+        </a>
+        <a class="sidebar-item {% block nav_reports_revenue %}{% endblock %}" href="{% url 'reports:report_revenue' %}">
+          <i class="bi bi-cash-stack si-icon"></i> Revenue
+        </a>
+        <a class="sidebar-item {% block nav_reports_halls %}{% endblock %}" href="{% url 'reports:report_halls' %}">
+          <i class="bi bi-building si-icon"></i> Hall Utilisation
+        </a>
+        <a class="sidebar-item {% block nav_reports_audit %}{% endblock %}" href="{% url 'reports:report_audit' %}">
+          <i class="bi bi-shield-check si-icon"></i> Audit Trail
+        </a>
+        <a class="sidebar-item" href="{% url 'reports:report_centre' %}">
+          <i class="bi bi-journal-text si-icon"></i> All Reports
+        </a>
+      </div>
+    </div>
     {% endif %}
 
     <!-- Admin -->

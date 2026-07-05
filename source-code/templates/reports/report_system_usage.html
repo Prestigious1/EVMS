@@ -1,0 +1,89 @@
+{% extends "reports/bi_base.html" %}
+{% load static %}
+
+{% block title %}System Usage Report{% endblock %}
+{% block nav_reports_system_usage %}active{% endblock %}
+
+{% block bi_title %}System Usage Analytics{% endblock %}
+{% block bi_subtitle %}Analyze device and browser usage metrics across EVMS{% endblock %}
+{% block bi_icon %}bi-laptop{% endblock %}
+
+{% block bi_filters %}{% endblock %}
+
+{% block bi_content %}
+<div class="row g-3 mb-4">
+  <div class="col-12 col-md-4">
+    <div class="kpi-card border-info">
+      <div class="kpi-value">{{ active_users }}</div>
+      <div class="kpi-label">Active Users (Last 30 Days)</div>
+    </div>
+  </div>
+</div>
+
+<div class="row g-4 mb-4">
+  <div class="col-12 col-md-6">
+    <div class="analytics-card">
+      <h6 class="text-uppercase text-muted fw-bold mb-4">Operating Systems</h6>
+      <div class="chart-container">
+        <canvas id="osChart"></canvas>
+      </div>
+    </div>
+  </div>
+  <div class="col-12 col-md-6">
+    <div class="analytics-card">
+      <h6 class="text-uppercase text-muted fw-bold mb-4">Browsers</h6>
+      <div class="chart-container">
+        <canvas id="browserChart"></canvas>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block bi_scripts %}
+<script>
+document.addEventListener("DOMContentLoaded", function() {
+  const c = getThemeColors();
+  
+  // OS Chart
+  const ctxOs = document.getElementById('osChart');
+  if(ctxOs) {
+    new Chart(ctxOs, {
+      type: 'doughnut',
+      data: {
+        labels: {{ os_labels|safe }},
+        datasets: [{
+          data: {{ os_counts|safe }},
+          backgroundColor: ['#60a5fa', '#34d399', '#facc15', '#a78bfa', '#94a3b8'],
+          borderWidth: 0
+        }]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { position: 'right', labels: { boxWidth: 10, color: c.textColor } } }
+      }
+    });
+  }
+
+  // Browser Chart
+  const ctxBrowser = document.getElementById('browserChart');
+  if(ctxBrowser) {
+    new Chart(ctxBrowser, {
+      type: 'pie',
+      data: {
+        labels: {{ browser_labels|safe }},
+        datasets: [{
+          data: {{ browser_counts|safe }},
+          backgroundColor: ['#f87171', '#4ade80', '#fbbf24', '#60a5fa', '#a78bfa'],
+          borderWidth: 0
+        }]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { position: 'right', labels: { boxWidth: 10, color: c.textColor } } }
+      }
+    });
+  }
+});
+</script>
+{% endblock %}

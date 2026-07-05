@@ -1,12 +1,13 @@
 from __future__ import annotations
 
+import uuid
 from typing import Optional
 
 from django.conf import settings
 from django.core.mail import send_mail
 from django.utils.html import strip_tags
 
-from core.models import AuditLog
+from core.models import AuditLog, ActivityLog
 from notifications.models import Notification
 
 
@@ -16,6 +17,58 @@ def get_client_ip(request) -> str | None:
     if x_forwarded_for:
         return x_forwarded_for.split(",")[0].strip()
     return request.META.get("REMOTE_ADDR")
+
+
+def get_user_agent_info(request) -> tuple[str, str]:
+    """Parse browser name and OS from the User-Agent string.
+
+    Returns:
+        (browser, os_info) — both strings, may be empty.
+    """
+    ua = request.META.get("HTTP_USER_AGENT", "") if request else ""
+    browser = ""
+    os_info = ""
+
+    if ua:
+        ua_lower = ua.lower()
+
+        # OS detection (order matters — most specific first)
+        if "windows nt 10" in ua_lower:
+            os_info = "Windows 10/11"
+        elif "windows nt 6.3" in ua_lower:
+            os_info = "Windows 8.1"
+        elif "windows nt 6.1" in ua_lower:
+            os_info = "Windows 7"
+        elif "windows" in ua_lower:
+            os_info = "Windows"
+        elif "mac os x" in ua_lower:
+            os_info = "macOS"
+        elif "android" in ua_lower:
+            os_info = "Android"
+        elif "iphone" in ua_lower or "ipad" in ua_lower:
+            os_info = "iOS"
+        elif "linux" in ua_lower:
+            os_info = "Linux"
+        else:
+            os_info = "Unknown OS"
+
+        # Browser detection (order matters — Edge before Chrome, Chrome before Safari)
+        if "edg/" in ua_lower:
+            browser = "Microsoft Edge"
+        elif "opr/" in ua_lower or "opera" in ua_lower:
+            browser = "Opera"
+        elif "firefox/" in ua_lower:
+            browser = "Firefox"
+        elif "chrome/" in ua_lower:
+            browser = "Chrome"
+        elif "safari/" in ua_lower:
+            browser = "Safari"
+        elif "msie" in ua_lower or "trident/" in ua_lower:
+            browser = "Internet Explorer"
+        else:
+            browser = "Unknown Browser"
+
+    return browser, os_info
 
 
 def create_audit_log(
@@ -28,6 +81,9 @@ def create_audit_log(
     new_value: str = "",
     ip_address: str | None = None,
     request=None,
+    affected_module: str = "",
+    reason: str = "",
+    comments: str = "",
 ) -> AuditLog:
     """Create a rich, immutable audit log entry.
 
@@ -38,24 +94,62 @@ def create_audit_log(
         object_repr: String representation of the affected object.
         old_value: Serialised previous state (JSON string or human-readable).
         new_value: Serialised new state.
-        ip_address: Explicit IP override. If omitted, extracted from `request`.
-        request: Django HttpRequest used to extract IP and user role.
+        ip_address: Explicit IP override. If omitted, extracted from ``request``.
+        request: Django HttpRequest used to extract IP, user-agent, role.
+        affected_module: App/module where the action occurred (e.g. 'reservations').
+        reason: Reason for the action if provided.
+        comments: Additional context or notes.
     """
     auth_user = user if getattr(user, "is_authenticated", False) else None
     role = getattr(auth_user, "role", "") or ""
+    department = getattr(auth_user, "department", "") or ""
 
     if ip_address is None and request is not None:
         ip_address = get_client_ip(request)
 
+    browser, os_info = get_user_agent_info(request)
+    request_id = str(uuid.uuid4())[:16] if request else ""
+
     return AuditLog.objects.create(
         user=auth_user,
         role=role,
+        department=department,
         action=action,
         model_name=model_name,
         object_repr=object_repr,
+        affected_module=affected_module or model_name.lower(),
         old_value=old_value,
         new_value=new_value,
+        reason=reason,
+        comments=comments,
         ip_address=ip_address,
+        browser=browser,
+        os_info=os_info,
+        request_id=request_id,
+    )
+
+
+def create_activity_log(
+    *,
+    user,
+    action: str,
+    affected_object: str = "",
+    previous_value: str = "",
+    new_value: str = "",
+    request=None,
+) -> ActivityLog:
+    """Create an activity log entry (lightweight, non-immutable)."""
+    auth_user = user if getattr(user, "is_authenticated", False) else None
+    role = getattr(auth_user, "role", "") or ""
+    ip = get_client_ip(request) if request else None
+    return ActivityLog.objects.create(
+        user=auth_user,
+        role=role,
+        action=action,
+        affected_object=affected_object,
+        previous_value=previous_value,
+        new_value=new_value,
+        ip_address=ip,
     )
 
 
@@ -104,7 +198,9 @@ def can_view_reports(user) -> bool:
     """
     Returns True if the user can access the reports dashboard and exports.
 
-    Granted to: ADMIN, STAFF, and anyone with the 'view_reports' RoleCapability.
+    Granted to: ADMIN, STAFF, VENTURES, FACILITY, BURSARY, and anyone with the
+    'view_reports' RoleCapability.
     """
     from users.services import can
-    return can(user, "view_reports") or getattr(user, "role", None) in ("ADMIN", "STAFF")
+    role = getattr(user, "role", None)
+    return can(user, "view_reports") or role in ("ADMIN", "STAFF", "VENTURES", "FACILITY", "BURSARY")

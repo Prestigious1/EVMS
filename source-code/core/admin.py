@@ -2,7 +2,7 @@ from django.contrib import admin
 from django.contrib.admin.widgets import AdminTextareaWidget
 from django.db import models
 
-from core.models import ActivityLog, Announcement, AuditLog, ContactMessage, FAQ
+from core.models import ActivityLog, AcademicPeriod, Announcement, AuditLog, ContactMessage, FAQ
 
 try:
     from django_ckeditor_5.widgets import CKEditor5Widget
@@ -21,9 +21,27 @@ class ActivityLogAdmin(admin.ModelAdmin):
 
 @admin.register(AuditLog)
 class AuditLogAdmin(admin.ModelAdmin):
-    list_display = ("timestamp", "user", "model_name", "action")
-    list_filter = ("model_name", "timestamp")
-    search_fields = ("user__email", "action", "model_name")
+    list_display = ("timestamp", "user", "role", "department", "affected_module", "model_name", "action", "ip_address")
+    list_filter = ("model_name", "affected_module", "role", "timestamp")
+    search_fields = ("user__email", "action", "model_name", "object_repr", "affected_module", "request_id")
+    readonly_fields = (
+        "timestamp", "user", "role", "department", "action", "model_name", "object_repr",
+        "affected_module", "old_value", "new_value", "reason", "comments",
+        "ip_address", "browser", "os_info", "request_id",
+    )
+
+    def has_add_permission(self, request):
+        return False  # Audit logs are immutable
+
+    def has_change_permission(self, request, obj=None):
+        return False  # Audit logs are immutable
+
+
+@admin.register(AcademicPeriod)
+class AcademicPeriodAdmin(admin.ModelAdmin):
+    list_display = ("name", "period_type", "start_date", "end_date", "is_current", "created_at")
+    list_filter = ("period_type", "is_current")
+    search_fields = ("name",)
 
 
 @admin.register(FAQ)

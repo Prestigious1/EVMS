@@ -2,6 +2,10 @@ from django.conf import settings
 from django.db import models, transaction
 
 
+def hall_image_path(instance, filename):
+    return f"halls/{instance.hall_id}/{filename}"
+
+
 class HallCategory(models.TextChoices):
     LECTURE = "LECTURE", "Lecture Hall"
     CONFERENCE = "CONFERENCE", "Conference Hall"
@@ -80,7 +84,7 @@ class Hall(models.Model):
 
 class HallImage(models.Model):
     hall = models.ForeignKey(Hall, on_delete=models.CASCADE, related_name="gallery_images")
-    image = models.ImageField(upload_to="halls/gallery/")
+    image = models.ImageField(upload_to=hall_image_path)
     is_cover = models.BooleanField(
         default=False,
         help_text="Only one image per hall can be the cover. Setting this removes cover from all others."

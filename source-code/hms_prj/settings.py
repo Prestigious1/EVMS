@@ -51,6 +51,9 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
 
+    'cloudinary_storage',
+    'cloudinary',
+
     # Project Apps (rebuilt architecture)
     'core.apps.CoreConfig',
     'users',
@@ -67,6 +70,7 @@ INSTALLED_APPS = [
     'django_ckeditor_5',
     'taggit',
     "anymail",
+    
     # Removed legacy payment/tracking apps in rebuild
 ]
 
@@ -172,6 +176,11 @@ if not DEBUG:
     SECURE_HSTS_INCLUDE_SUBDOMAINS = True
     SECURE_HSTS_PRELOAD = False
 
+CLOUDINARY_STORAGE = {
+    "CLOUD_NAME": env("CLOUDINARY_CLOUD_NAME", default=""),
+    "API_KEY": env("CLOUDINARY_API_KEY", default=""),
+    "API_SECRET": env("CLOUDINARY_API_SECRET", default=""),
+}
 
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/3.2/howto/static-files/
@@ -186,20 +195,28 @@ STATICFILES_DIRS = [
 
 STATICFILES_FINDERS = [
     "django.contrib.staticfiles.finders.FileSystemFinder",
-    "hms_prj.static_finders.AppDirectoriesWithoutJazzminFinder",
+    "django.contrib.staticfiles.finders.AppDirectoriesFinder",
 ]
 
-STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
+STORAGES = {
+    "default": {
+        "BACKEND": "cloudinary_storage.storage.MediaCloudinaryStorage",
+    },
+    "staticfiles": {
+        "BACKEND": "hms_prj.storage.EVMSStaticFilesStorage",
+    },
+}
 STATICFILES_IGNORE_PATTERNS = [
     "*.py",
     "*.pyc",
     "*.map",
     "*.bak",
 ]
+WHITENOISE_MANIFEST_STRICT = False
 
-MEDIA_URL = '/media/'
+#MEDIA_URL = '/media/'
 
-MEDIA_ROOT = os.path.join(BASE_DIR, "media")
+#MEDIA_ROOT = os.path.join(BASE_DIR, "media")
 
 CKEDITOR_UPLOAD_PATH = 'uploads/'
 

@@ -434,7 +434,13 @@ def hall_create(request):
             )
             messages.success(request, f"Hall '{hall.name}' created successfully.")
             return redirect("hall:hall_update", pk=hall.pk)
-        messages.error(request, "Please correct the errors below.")
+        # Show detailed errors so we can diagnose the failure
+        for field, errors in form.errors.items():
+            for error in errors:
+                messages.error(request, f"Field '{field}': {error}")
+        if form.non_field_errors():
+            for error in form.non_field_errors():
+                messages.error(request, f"Form error: {error}")
     else:
         form = FormClass()
 

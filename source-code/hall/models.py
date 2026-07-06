@@ -84,7 +84,7 @@ class Hall(models.Model):
 
 class HallImage(models.Model):
     hall = models.ForeignKey(Hall, on_delete=models.CASCADE, related_name="gallery_images")
-    image = models.ImageField(upload_to=hall_image_path)
+    image = models.ImageField(upload_to=hall_image_path, max_length=500)
     is_cover = models.BooleanField(
         default=False,
         help_text="Only one image per hall can be the cover. Setting this removes cover from all others."

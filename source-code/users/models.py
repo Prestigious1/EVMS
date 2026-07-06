@@ -19,7 +19,7 @@ class User(AbstractUser):
     phone_number = models.CharField(max_length=30, blank=True)
     role = models.CharField(max_length=20, choices=UserRole.choices, default=UserRole.EXTERNAL)
     department = models.CharField(max_length=200, blank=True)
-    profile_image = models.ImageField(upload_to="users/profiles/", blank=True, null=True)
+    profile_image = models.ImageField(upload_to="users/profiles/", max_length=500, blank=True, null=True)
     is_verified = models.BooleanField(default=False)
     is_blocked = models.BooleanField(default=False, help_text="Blocked users cannot make reservations.")
 

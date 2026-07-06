@@ -377,7 +377,7 @@ class ThreadMessage(models.Model):
 
 class ThreadAttachment(models.Model):
     message     = models.ForeignKey(ThreadMessage, on_delete=models.CASCADE, related_name="attachments")
-    file        = models.FileField(upload_to="reservations/thread_attachments/")
+    file        = models.FileField(upload_to="reservations/thread_attachments/", max_length=500)
     filename    = models.CharField(max_length=255, blank=True)
     uploaded_at = models.DateTimeField(auto_now_add=True)
 
@@ -433,7 +433,7 @@ class DamageReport(models.Model):
 
 class DamagePhoto(models.Model):
     damage_report = models.ForeignKey(DamageReport, on_delete=models.CASCADE, related_name="photos")
-    photo         = models.ImageField(upload_to="reservations/damage_photos/")
+    photo         = models.ImageField(upload_to="reservations/damage_photos/", max_length=500)
     caption       = models.CharField(max_length=255, blank=True)
     uploaded_by   = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True)
     uploaded_at   = models.DateTimeField(auto_now_add=True)
@@ -444,7 +444,7 @@ class DamagePhoto(models.Model):
 
 class DamageDocument(models.Model):
     damage_report = models.ForeignKey(DamageReport, on_delete=models.CASCADE, related_name="supporting_documents")
-    file          = models.FileField(upload_to="reservations/damage_documents/")
+    file          = models.FileField(upload_to="reservations/damage_documents/", max_length=500)
     description   = models.CharField(max_length=255, blank=True)
     uploaded_by   = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True)
     uploaded_at   = models.DateTimeField(auto_now_add=True)
@@ -544,7 +544,7 @@ class DocumentType(models.TextChoices):
 class ReservationDocument(models.Model):
     reservation   = models.ForeignKey(Reservation, on_delete=models.CASCADE, related_name="documents")
     document_type = models.CharField(max_length=50, choices=DocumentType.choices)
-    file          = models.FileField(upload_to="reservations/documents/")
+    file          = models.FileField(upload_to="reservations/documents/", max_length=500)
     version       = models.PositiveIntegerField(default=1)
     uploaded_by   = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True)
     uploaded_at   = models.DateTimeField(auto_now_add=True)
@@ -611,7 +611,7 @@ class HallInspectionReport(models.Model):
 
 class InspectionPhoto(models.Model):
     inspection  = models.ForeignKey(HallInspectionReport, on_delete=models.CASCADE, related_name="photos")
-    photo       = models.ImageField(upload_to="reservations/inspection_photos/")
+    photo       = models.ImageField(upload_to="reservations/inspection_photos/", max_length=500)
     caption     = models.CharField(max_length=255, blank=True)
     uploaded_at = models.DateTimeField(auto_now_add=True)
 

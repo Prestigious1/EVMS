@@ -122,7 +122,7 @@ class PaymentProof(models.Model):
         related_name="payment_proofs",
     )
     uploaded_by     = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="payment_proofs")
-    receipt_file    = models.FileField(upload_to="payments/proofs/", help_text="Scanned/photographed receipt or bank evidence")
+    receipt_file    = models.FileField(upload_to="payments/proofs/", max_length=500, help_text="Scanned/photographed receipt or bank evidence")
     transaction_ref = models.CharField(max_length=120, blank=True, help_text="Bank/payment transaction reference number")
     amount_claimed  = models.DecimalField(max_digits=12, decimal_places=2, default=0, help_text="Amount applicant claims to have paid")
     payment_type    = models.CharField(max_length=10, choices=PaymentProofType.choices, default=PaymentProofType.BOOKING)

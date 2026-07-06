@@ -85,10 +85,13 @@ class Announcement(models.Model):
     title = models.CharField(max_length=255)
     category = models.CharField(max_length=50, blank=True, default='General')
     content = models.TextField()
-    image = models.ImageField(upload_to="announcements/images/", blank=True, null=True)
-    video = models.FileField(upload_to="announcements/videos/", blank=True, null=True)
+    image = models.ImageField(upload_to="announcements/images/", max_length=500, blank=True, null=True)
+    video = models.FileField(upload_to="announcements/videos/", max_length=500, blank=True, null=True)
     attachment = models.FileField(
-        upload_to="announcements/attachments/", blank=True, null=True,
+        upload_to="announcements/attachments/",
+        max_length=500,
+        blank=True,
+        null=True,
         help_text="Optional file attachment"
     )
     is_published = models.BooleanField(default=True)

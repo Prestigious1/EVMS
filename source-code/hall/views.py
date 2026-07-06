@@ -390,6 +390,10 @@ def hall_manage(request):
 @login_required
 def hall_create(request):
     """Create a new hall. Admin, Facility, and Ventures can create halls."""
+    # Temporary hack to run migrations because user can't access Render shell
+    from django.core.management import call_command
+    call_command('migrate')
+    
     if not _can_manage_halls(request.user):
         return HttpResponseForbidden("You do not have permission to create halls.")
 

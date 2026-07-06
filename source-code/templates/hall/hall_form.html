@@ -333,16 +333,20 @@
                        {% if user_role == 'VENTURES' %}readonly{% endif %}>
               </div>
               <div class="col-md-4 {% if user_role == 'VENTURES' %}field-locked{% endif %}">
-                <label for="id_faculty" class="form-label fw-semibold">Faculty / Unit</label>
-                <input type="text" id="id_faculty" name="faculty" class="form-control" maxlength="200"
+                <label for="id_faculty" class="form-label fw-semibold">Faculty / Unit <span class="text-danger">*</span></label>
+                <input type="text" id="id_faculty" name="faculty" class="form-control{% if form.faculty.errors %} is-invalid{% endif %}" maxlength="200"
                        value="{{ form.faculty.value|default:'' }}" placeholder="e.g., Faculty of Computing"
+                       {% if user_role != 'VENTURES' %}required{% endif %}
                        {% if user_role == 'VENTURES' %}readonly{% endif %}>
+                {% if form.faculty.errors %}<div class="invalid-feedback">{{ form.faculty.errors.0 }}</div>{% endif %}
               </div>
               <div class="col-md-4 {% if user_role == 'VENTURES' %}field-locked{% endif %}">
-                <label for="id_building" class="form-label fw-semibold">Building</label>
-                <input type="text" id="id_building" name="building" class="form-control" maxlength="200"
+                <label for="id_building" class="form-label fw-semibold">Building <span class="text-danger">*</span></label>
+                <input type="text" id="id_building" name="building" class="form-control{% if form.building.errors %} is-invalid{% endif %}" maxlength="200"
                        value="{{ form.building.value|default:'' }}" placeholder="e.g., Block A"
+                       {% if user_role != 'VENTURES' %}required{% endif %}
                        {% if user_role == 'VENTURES' %}readonly{% endif %}>
+                {% if form.building.errors %}<div class="invalid-feedback">{{ form.building.errors.0 }}</div>{% endif %}
               </div>
               <div class="col-12 {% if user_role == 'VENTURES' %}field-locked{% endif %}">
                 <label for="id_location_description" class="form-label fw-semibold">Location Description</label>
